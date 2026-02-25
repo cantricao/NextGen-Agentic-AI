@@ -1,26 +1,26 @@
 # Core AI & Orchestration
-langchain-core==0.3.29
-langchain-google-genai==2.0.7
-langgraph==0.2.61
-langgraph-checkpoint-sqlite==2.0.1
+langchain-core
+langchain-google-genai
+langgraph
+langgraph-checkpoint-sqlite
 
 # UI & Environment Setup
-streamlit==1.41.1
-python-dotenv==1.0.1
-pyngrok==7.1.6
+streamlit
+python-dotenv
+pyngrok
 
 # Vector Database & Embeddings
-chromadb==0.6.0
-langchain-chroma==0.2.0
-sentence-transformers==3.3.1
-numpy==2.2.0
+chromadb
+langchain-chroma
+sentence-transformers
+numpy
 
 # Data Processing
-pandas==2.2.3
+pandas
 
 # Data Ingestion Tools
-requests==2.32.3
-datasets==3.2.0
+requests
+datasets
 
 # Semantic Caching
-redis==5.0.1
+redis

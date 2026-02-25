@@ -65,13 +65,13 @@ cd NextGen-Agentic-AI
 pip install -r requirements.txt
 ```
 
-**2. Fetch Real-World Banking Datasets:**Populates the data directory with live FDIC and HuggingFace data.
+**2. Fetch Real-World Banking Datasets:** Populates the data directory with live FDIC and HuggingFace data.
 
 ```bash
 python scripts/fetch_real_data.py
 ```
 
-**3. Initialize Redis Server (Required for Clinical Cache):**Sets up the Redis daemon for the semantic caching layer.
+**3. Initialize Redis Server (Required for Clinical Cache):** Sets up the Redis daemon for the semantic caching layer.
 
 ```bash
 # On Linux / Google Colab
@@ -80,7 +80,7 @@ apt-get install -y redis-server -qq
 redis-server --daemonize yes
 ```
 
-**4. Launch the Applications via Streamlit:**Ensure your .env contains your GOOGLE\_API\_KEY.
+**4. Launch the Applications via Streamlit:** Ensure your .env contains your GOOGLE\_API\_KEY.
 
 ```bash
 # Run the Medical Agent
