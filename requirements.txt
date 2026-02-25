@@ -1,9 +1,23 @@
-langchain>=0.1.0
-langchain-google-genai
-langgraph
-pandas
-faiss-cpu
-python-dotenv
-streamlit
-sentence-transformers
-numpy
+# Core AI & Orchestration
+langchain-core==0.3.29
+langchain-google-genai==2.0.7
+langgraph==0.2.61
+langgraph-checkpoint-sqlite==2.0.1
+
+# UI & Environment Setup
+streamlit==1.41.1
+python-dotenv==1.0.1
+pyngrok==7.1.6
+
+# Vector Database & Embeddings
+chromadb==0.6.0
+langchain-chroma==0.2.0
+sentence-transformers==3.3.1
+numpy==2.2.0
+
+# Data Processing
+pandas==2.2.3
+
+# Data Ingestion Tools
+requests==2.32.3
+datasets==3.2.0
