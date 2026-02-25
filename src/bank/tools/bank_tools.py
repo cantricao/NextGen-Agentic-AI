@@ -1,19 +1,22 @@
-from langchain_core.tools import tool
+import os
 import json
+import pandas as pd
+from langchain_core.tools import tool
+
+# Resolve the absolute path to the data directory
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+# Load CSV files into memory during system startup
+faq_path = os.path.join(DATA_DIR, "US_Bank_FAQs.csv")
+branch_path = os.path.join(DATA_DIR, "US_Bank_Branches.csv")
+
+faq_df = pd.read_csv(faq_path) if os.path.exists(faq_path) else pd.DataFrame()
+branch_df = pd.read_csv(branch_path) if os.path.exists(branch_path) else pd.DataFrame()
 
 @tool
 def calculate_dti(monthly_income: float, monthly_debt: float) -> str:
-    """
-    Calculates the Debt-to-Income (DTI) ratio for a customer.
-    The Loan Agent MUST use this tool to evaluate creditworthiness before approving a loan.
-    
-    Args:
-        monthly_income (float): Total monthly income in local currency.
-        monthly_debt (float): Total monthly debt payments.
-        
-    Returns:
-        str: A JSON string containing the DTI ratio and a risk assessment.
-    """
+    """Calculates the Debt-to-Income (DTI) ratio for a customer."""
     if monthly_income <= 0:
         return json.dumps({"error": "Income must be greater than zero."})
     
@@ -30,24 +33,20 @@ def calculate_dti(monthly_income: float, monthly_debt: float) -> str:
 def search_nearest_branch(user_location: str) -> str:
     """
     Finds the nearest physical bank branch based on the user's current city or location.
-    
-    Args:
-        user_location (str): The current city, province, or address of the user.
-        
-    Returns:
-        str: Address and distance to the nearest branch.
+    Reads real data from US_Bank_Branches.csv.
     """
-    # Mock database mapping locations to branches
-    database = {
-        "hanoi": "Hoan Kiem Branch, 123 Ly Thai To, Hanoi (Distance: 2.1 km)",
-        "ho chi minh": "District 1 Branch, 456 Nguyen Hue, HCMC (Distance: 1.5 km)",
-        "da nang": "Hai Chau Branch, 789 Bach Dang, Da Nang (Distance: 3.0 km)"
-    }
+    if branch_df.empty:
+        return "Branch data system is currently under maintenance or missing CSV file."
+
+    location_key = user_location.lower().strip()
     
-    location_key = user_location.lower()
-    for key, branch in database.items():
-        if key in location_key:
-            return f"The nearest branch is: {branch}."
+    # Scan for the location keyword across all columns in the CSV
+    mask = branch_df.apply(lambda row: row.astype(str).str.lower().str.contains(location_key).any(), axis=1)
+    results = branch_df[mask]
+
+    if not results.empty:
+        top_branch = results.iloc[0].to_dict()
+        return f"Found nearest branch: {top_branch}."
             
     return "Cannot find a branch near your location. Please contact our hotline at 1900-xxxx."
 
@@ -55,18 +54,19 @@ def search_nearest_branch(user_location: str) -> str:
 def get_bank_faq(topic: str) -> str:
     """
     Retrieves official bank policies, interest rates, and general FAQs.
-    
-    Args:
-        topic (str): The specific topic to look up (e.g., 'interest rate', 'credit card fee').
-        
-    Returns:
-        str: Information regarding the requested policy.
+    Reads real data from US_Bank_FAQs.csv.
     """
-    # In production, this would query FAISS or ChromaDB. 
-    # Here we use a mock retrieval for demonstration.
-    topic = topic.lower()
-    if "interest" in topic or "rate" in topic:
-        return "Current loan interest rate is 6.5% p.a. for the first 12 months, and floating thereafter."
-    elif "fee" in topic or "card" in topic:
-        return "Annual credit card fee is $50, waived if annual spending exceeds $5,000."
-    return "Please visit our website for more detailed policies."
+    if faq_df.empty:
+        return "Policy data system is currently under maintenance or missing CSV file."
+
+    topic_key = topic.lower().strip()
+    
+    # Scan for the topic keyword across all columns in the CSV
+    mask = faq_df.apply(lambda row: row.astype(str).str.lower().str.contains(topic_key).any(), axis=1)
+    results = faq_df[mask]
+
+    if not results.empty:
+        answer = results.iloc[0].to_dict()
+        return f"Policy information: {answer}"
+        
+    return "I cannot find

@@ -1,55 +1,40 @@
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode
 from src.bank.state import BankAgentState
 from src.bank.nodes import router_node, loan_agent_node, faq_agent_node
-from src.bank.tools.bank_tools import calculate_dti, search_nearest_branch, get_bank_faq
+from langgraph.checkpoint.memory import MemorySaver
 
-def route_logic(state: BankAgentState) -> str:
+def route_after_router(state: BankAgentState) -> str:
     """
-    Conditional routing function to direct the flow based on Router's decision.
+    Determines the next node based on the router's intent classification.
     """
-    return state.get("next_route", "faq_agent")
-
-def should_continue(state: BankAgentState) -> str:
-    """
-    Determines if the current agent invoked a tool or if it finished generating a response.
-    """
-    last_message = state["messages"][-1]
-    # If the LLM decided to use a tool, route to the 'tools' node
-    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-        return "tools"
-    # Otherwise, the interaction is complete
-    return END
+    intent = state.get("current_intent")
+    if intent == "LOAN_INQUIRY":
+        return "loan_agent"
+    elif intent == "FAQ_OR_LOCATION":
+        return "faq_agent"
+    else:
+        return END
 
 def create_bank_graph():
     """
-    Compiles the state machine for the multi-agent system.
+    Compiles the Multi-Agent Banking workflow with a persistent memory checkpointer.
     """
     workflow = StateGraph(BankAgentState)
     
-    # Define the nodes
+    # 1. Add Nodes
     workflow.add_node("router", router_node)
     workflow.add_node("loan_agent", loan_agent_node)
     workflow.add_node("faq_agent", faq_agent_node)
     
-    # Create a ToolNode containing all available tools
-    tools = [calculate_dti, search_nearest_branch, get_bank_faq]
-    tool_node = ToolNode(tools)
-    workflow.add_node("tools", tool_node)
-    
-    # Define the flow
+    # 2. Define Edges & Routing
     workflow.set_entry_point("router")
+    workflow.add_conditional_edges("router", route_after_router)
     
-    # Route from router to specific agents
-    workflow.add_conditional_edges("router", route_logic)
+    workflow.add_edge("loan_agent", END)
+    workflow.add_edge("faq_agent", END)
     
-    # Route from agents to tools or END
-    workflow.add_conditional_edges("loan_agent", should_continue)
-    workflow.add_conditional_edges("faq_agent", should_continue)
+    # 3. Initialize MemorySaver to track conversation history per thread
+    memory = MemorySaver()
     
-    # Tools route back to the agent that called them
-    # For simplicity, we route back to router to let it re-evaluate, 
-    # but in advanced setups, you route back to the specific caller.
-    workflow.add_edge("tools", "router")
-    
-    return workflow.compile()
+    # Compile with checkpointer
+    return workflow.compile(checkpointer=memory)
