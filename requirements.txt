@@ -21,3 +21,6 @@ pandas==2.2.3
 # Data Ingestion Tools
 requests==2.32.3
 datasets==3.2.0
+
+# Semantic Caching
+redis==5.0.1

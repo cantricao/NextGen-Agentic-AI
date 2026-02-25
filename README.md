@@ -103,6 +103,19 @@ python src/protocols/a2a_demo.py
 python src/oss_agents/local_function_caller.py
 ```
 
+## 📸 System in Action (Visual Outputs)
+
+*Below are the expected outputs when running the ecosystem:*
+
+**1. Clinical RAG Agent (Sub-100ms Redis Cache Hit)**
+> *[Insert Screenshot of Streamlit UI showing the Clinical Agent answering a medical query with the "⏱️ Latency: 0.05s | Cache: ✅ Hit" metric]*
+
+**2. Bank Multi-Agent Routing**
+> *[Insert Screenshot of Streamlit UI showing the Router delegating a loan calculation to the Loan Agent]*
+
+**3. Advanced Protocol Execution (Terminal)**
+> *[Insert Screenshot of Terminal logs demonstrating the MCP Server or Offline OSS Function Calling]*
+
 👨‍💻 About the Author
 ----------------------
 
@@ -110,7 +123,7 @@ python src/oss_agents/local_function_caller.py
 
 With over 3 years of professional experience in developing machine learning models and automated data pipelines , I hold a Master of Data Analytics from QUT. My core focus lies at the intersection of computational biology, genomic data analysis, and scalable AI infrastructure. This repository reflects my passion for building secure, data-driven systems that solve complex translational challenges.
 
-*   **Email:** [cantricao@gmail.com]
-*   **LinkedIn:** [https://www.linkedin.com/in/cao-tri-can-08188b21b/]
-*   **Portfolio:** [https://cumbersome-tachometer-03f.notion.site/]
-*   **GitHub:** [http://github.com/cantricao]
+* **Email:** cantricao@gmail.com
+* **LinkedIn:** [linkedin.com/in/cao-tri-can](https://www.linkedin.com/in/cao-tri-can-08188b21b/)
+* **Portfolio:** [Notion Portfolio](https://cumbersome-tachometer-03f.notion.site/)
+* **GitHub:** [github.com/cantricao](http://github.com/cantricao)
