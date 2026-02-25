@@ -1,59 +1,103 @@
-import hashlib
+import json
 import numpy as np
+import redis
 from sentence_transformers import SentenceTransformer
-from typing import Optional, Dict
 
-class SemanticCache:
-    """
-    Enterprise-grade Semantic Cache with Multi-tenant isolation.
-    Uses vector embeddings to detect similar queries and save LLM costs.
-    """
-    def __init__(self, similarity_threshold: float = 0.90):
-        # Load a fast, lightweight embedding model for caching
-        self.encoder = SentenceTransformer('all-MiniLM-L6-v2')
-        self.threshold = similarity_threshold
-        # In production, this would be Redis or Memcached. 
-        # Using in-memory dict for demonstration.
-        self.cache: Dict[str, list] = {}
+# Initialize the lightweight local embedding model
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
-    def _generate_namespace(self, patient_id: str) -> str:
-        """Creates a secure hash namespace to prevent context leakage between patients."""
-        return hashlib.sha256(patient_id.encode()).hexdigest()
+# Initialize Redis connection for local Colab environment
+try:
+    # Using decode_responses=True automatically decodes bytes to strings
+    redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    redis_client.ping()
+    print("[INFO] Redis connection established for Semantic Cache.")
+except Exception as e:
+    print(f"[WARNING] Redis connection failed: {e}. Proceeding without caching.")
+    redis_client = None
 
-    def check_cache(self, patient_id: str, query: str) -> Optional[str]:
+class ClinicalSemanticCache:
+    def __init__(self, threshold: float = 0.85):
         """
-        Checks if a semantically similar query exists for this specific patient.
+        Initializes the Semantic Cache with a cosine similarity threshold.
+        Queries scoring above this threshold will trigger a cache hit.
         """
-        namespace = self._generate_namespace(patient_id)
-        if namespace not in self.cache:
+        self.threshold = threshold
+
+    def _get_namespace_key(self, patient_id: str) -> str:
+        """Generates a secure, isolated Redis Hash key per patient."""
+        return f"clinical_cache:{patient_id}"
+
+    def cosine_similarity(self, v1: list, v2: list) -> float:
+        """Calculates the cosine similarity between two vectors."""
+        vec1, vec2 = np.array(v1), np.array(v2)
+        norm_1 = np.linalg.norm(vec1)
+        norm_2 = np.linalg.norm(vec2)
+        
+        if norm_1 == 0 or norm_2 == 0:
+            return 0.0
+        return float(np.dot(vec1, vec2) / (norm_1 * norm_2))
+
+    def check_cache(self, patient_id: str, query: str) -> str | None:
+        """
+        Scans the Redis Hash for the patient to find semantically similar queries.
+        Returns the cached response if similarity exceeds the threshold.
+        """
+        if not redis_client:
             return None
 
-        query_vector = self.encoder.encode(query)
+        redis_key = self._get_namespace_key(patient_id)
+        query_vector = embedding_model.encode(query).tolist()
         
-        # Scan patient's specific cache vault
-        for cached_item in self.cache[namespace]:
-            cached_vector = cached_item['vector']
-            # Calculate Cosine Similarity
-            similarity = np.dot(query_vector, cached_vector) / (
-                np.linalg.norm(query_vector) * np.linalg.norm(cached_vector)
-            )
-            
-            if similarity >= self.threshold:
-                return cached_item['response']
+        # Retrieve all cached query-response pairs for this specific patient
+        cached_entries = redis_client.hgetall(redis_key)
+        
+        best_score = 0.0
+        best_response = None
+
+        # Compare the incoming query vector against all cached vectors in the namespace
+        for cached_query_text, json_payload in cached_entries.items():
+            try:
+                data = json.loads(json_payload)
+                cached_vector = data.get("embedding", [])
                 
+                score = self.cosine_similarity(query_vector, cached_vector)
+                
+                if score > best_score:
+                    best_score = score
+                    best_response = data.get("response")
+            except json.JSONDecodeError:
+                continue
+                
+        if best_score >= self.threshold:
+            print(f"[DEBUG] Semantic Cache Hit! Similarity: {best_score:.4f}")
+            return best_response
+            
         return None
 
-    def store_cache(self, patient_id: str, query: str, response: str):
-        """Stores a new query and response in the patient's isolated cache."""
-        namespace = self._generate_namespace(patient_id)
-        if namespace not in self.cache:
-            self.cache[namespace] = []
-            
-        query_vector = self.encoder.encode(query)
-        self.cache[namespace].append({
-            'vector': query_vector,
-            'response': response
-        })
+    def store_cache(self, patient_id: str, query: str, response: str) -> None:
+        """
+        Embeds the user query and stores it along with the LLM response 
+        in the Redis Hash, scoped to the patient ID.
+        """
+        if not redis_client:
+            return
 
-# Initialize a global singleton cache instance
-clinical_cache = SemanticCache()
+        redis_key = self._get_namespace_key(patient_id)
+        query_vector = embedding_model.encode(query).tolist()
+        
+        # Serialize the vector and response into a JSON payload
+        payload = json.dumps({
+            "embedding": query_vector,
+            "response": response
+        })
+        
+        # Store securely in the patient's specific Redis Hash
+        redis_client.hset(redis_key, query, payload)
+        
+        # Set a 24-hour Time-To-Live (TTL) for compliance with EHR data policies
+        redis_client.expire(redis_key, 86400)
+        print(f"[INFO] Successfully cached new interaction for patient: {patient_id}")
+
+# Export a globally accessible singleton instance
+clinical_cache = ClinicalSemanticCache()
