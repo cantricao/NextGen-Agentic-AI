@@ -45,7 +45,12 @@ if prompt := st.chat_input("Enter clinical query..."):
     
     with st.spinner("Analyzing..."):
         # Execute the LangGraph workflow
-        result = app_graph.invoke(initial_state)
+        # Create a configuration dictionary containing the thread_id.
+	# We use patient_id as the thread_id to isolate conversational memory per patient.
+	config = {"configurable": {"thread_id": patient_id}}
+
+	# Pass the config to the invoke method to enable persistent memory
+	result = app_graph.invoke(initial_state, config=config)
         final_msg = result["messages"][-1]
         
         # Display response and latency metrics
