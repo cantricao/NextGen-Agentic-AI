@@ -1,7 +1,7 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from src.state import BankAgentState
-from src.tools.bank_tools import calculate_dti, search_nearest_branch, get_bank_faq
+from src.bank.state import BankAgentState
+from src.bank.tools.bank_tools import calculate_dti, search_nearest_branch, get_bank_faq
 import os
 
 # Initialize the LLM (Using Gemini as configured in your Colab)

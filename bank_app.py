@@ -2,7 +2,7 @@ import streamlit as st
 import os
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
-from src.graph import create_bank_graph
+from src.bank.graph import create_bank_graph
 
 # Load environment variables
 load_dotenv()

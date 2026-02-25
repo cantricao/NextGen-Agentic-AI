@@ -1,8 +1,8 @@
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
-from src.state import BankAgentState
-from src.nodes import router_node, loan_agent_node, faq_agent_node
-from src.tools.bank_tools import calculate_dti, search_nearest_branch, get_bank_faq
+from src.bank.state import BankAgentState
+from src.bank.nodes import router_node, loan_agent_node, faq_agent_node
+from src.bank.tools.bank_tools import calculate_dti, search_nearest_branch, get_bank_faq
 
 def route_logic(state: BankAgentState) -> str:
     """
