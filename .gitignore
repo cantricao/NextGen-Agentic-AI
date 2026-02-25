@@ -1,0 +1,10 @@
+# Environments
+venv/
+.env
+
+# Python junks
+__pycache__/
+*.pyc
+
+# OS junks
+.DS_Store
