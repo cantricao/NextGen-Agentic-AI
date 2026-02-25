@@ -1,5 +1,7 @@
 import time
 import os
+import sqlite3
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import StateGraph, END
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
@@ -8,7 +10,7 @@ from src.clinical.cache import clinical_cache
 from src.clinical.vector_db import clinical_db
 
 # Initialize LLM
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.0)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.0)
 
 def check_cache_node(state: ClinicalState) -> ClinicalState:
     """Node 1: Intercepts the query and checks the Semantic Cache."""
@@ -71,7 +73,7 @@ def cache_routing(state: ClinicalState) -> str:
     return "generate_response"
 
 def create_clinical_graph():
-    """Compiles the LangGraph workflow for the Clinical Agent."""
+    """Compiles the LangGraph workflow for the Clinical Agent with SQLite Checkpointer."""
     workflow = StateGraph(ClinicalState)
     
     workflow.add_node("check_cache", check_cache_node)
@@ -82,4 +84,10 @@ def create_clinical_graph():
     workflow.add_conditional_edges("check_cache", cache_routing)
     workflow.add_edge("generate_response", END)
     
-    return workflow.compile()
+    # Initialize SQLite Database for persistent clinical memory
+    # Using check_same_thread=False to prevent Streamlit threading errors
+    conn = sqlite3.connect("clinical_checkpoints.sqlite", check_same_thread=False)
+    memory = SqliteSaver(conn)
+    
+    # Compile the graph with the persistent checkpointer
+    return workflow.compile(checkpointer=memory)
