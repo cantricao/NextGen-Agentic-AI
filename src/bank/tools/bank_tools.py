@@ -69,4 +69,4 @@ def get_bank_faq(topic: str) -> str:
         answer = results.iloc[0].to_dict()
         return f"Policy information: {answer}"
         
-    return "I cannot find
+    return "I cannot find any policies related to your question. Please visit the bank's website."
