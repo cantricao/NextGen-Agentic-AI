@@ -1,96 +1,92 @@
-🚀 NextGen Agentic AI Ecosystem
-===============================
+# 🚀 NextGen Agentic AI Ecosystem: Enterprise Multi-Agent & RAG Infrastructure
 
-📌 Executive Summary
---------------------
+## 📌 Executive Summary
+An enterprise-grade, multi-agent AI ecosystem demonstrating high-performance orchestration, real-time tool execution, and privacy-centric data retrieval. This repository moves beyond basic wrappers to implement **Stateful Graphs, Semantic Caching, and Multi-tenant Vector Isolation.**
 
-An enterprise-grade, multi-agent AI ecosystem built to demonstrate advanced orchestration, real-time tool execution, and privacy-first data retrieval. This repository moves beyond basic wrappers to implement **Stateful Graphs, Multi-tenant Vector Retrieval, and High-Performance Redis Caching.**
+Engineered for production-readiness, the architecture focuses on **Deterministic Execution**, **Sub-second Latency**, and **Zero-Hallucination** guardrails.
 
-Designed to run seamlessly on environments like Google Colab T4, the architecture emphasizes low latency, deterministic execution, and strict data isolation for production readiness.
 
-🏗️ Core Architectures & Microservices
---------------------------------------
 
-### 1. 🏥 Clinical RAG Agent (Privacy-First & Low Latency)
+---
 
-A high-performance healthcare assistant designed for electronic health records (EHR) with strict data boundaries.
+## 🏗️ Core Architectures & Microservices
 
-*   **Redis-Backed Semantic Caching:** Employs sentence-transformers combined with a **Redis** caching layer to intercept and resolve repeated queries, dropping API latency from **~3.0s to <0.1s**.
-    
-*   **Multi-tenant Security:** Uses **ChromaDB** with strict metadata filtering (patient\_id hashing) to ensure absolute data isolation between patient records.
-    
-*   **Audit-ready Persistence:** Integrated with LangGraph's SqliteSaver to write session checkpoints directly to disk, ensuring compliant audit trails and long-term conversational memory.
-    
+### 1. 🏥 Clinical RAG Agent (Privacy-First & High-Performance)
+A specialized healthcare assistant designed for Electronic Health Records (EHR) with strict security boundaries.
 
-### 2. 🏦 Enterprise Multi-Agent Bank System
+* **Redis-Backed Semantic Caching:** Implements a vector-similarity cache layer using `sentence-transformers`. It intercepts repeated queries by calculating **Cosine Similarity (Threshold: 0.75)**, reducing API latency from **~3.0s to <100ms** and cutting LLM token costs significantly.
+* **Multi-tenant Data Isolation:** Leverages **ChromaDB** with dynamic **Metadata Filtering**. Patient records are logically isolated using unique hashed identifiers, ensuring that the Retrieval phase never leaks data across different patient contexts.
+* **Audit-Ready Checkpoints:** Integrated with LangGraph’s `SqliteSaver` to persist conversation states, providing a compliant audit trail for medical interactions.
 
-A fully autonomous banking coordinator that routes user intents to specialized sub-agents.
+### 2. 🏦 Enterprise Multi-Agent Banking System
+A fully autonomous coordinator that manages financial inquiries through strict intent-based routing.
 
-*   **Agentic Routing:** Utilizes LangGraph to dynamically route queries between a Loan Agent (for financial calculations) and a FAQ/Location Agent.
-    
-*   **Real-time Data Ingestion:** Powered by custom Pandas tools querying real-world FDIC bank branch data and HuggingFace customer support datasets.
-    
-*   **Stateful Memory:** Implements MemorySaver to maintain conversational context across complex, multi-turn financial inquiries.
-    
+* **Stateful Agentic Routing:** Uses **LangGraph** to manage a directed acyclic graph (DAG). The **Semantic Router** classifies intents (Loan vs. FAQ) to prevent cross-domain contamination.
+* **Deterministic Tool Execution:** * **Loan Agent:** Extracts financial entities to execute a deterministic `calculate_dti` tool.
+    * **FAQ Agent:** Utilizes an in-memory **FAISS** vector store for blazingly fast retrieval of banking policies from CSV datasets.
+* **Conversational Persistence:** Employs `MemorySaver` to maintain thread-specific context, allowing the agent to handle complex, multi-turn follow-up questions (e.g., "I need to deposit some cash today. Where is the nearest branch to me?").
 
-### 3. 🔌 Advanced Agentic Protocols
+### 3. 🔌 Advanced Agentic Protocols (Next-Gen PoC)
+Proof-of-concept implementations for standardized AI communication:
+* **Model Context Protocol (MCP):** Implements a Client-Server architecture allowing LLMs to dynamically discover and bind modular banking tools at runtime.
+* **Offline OSS Function Calling:** Forces local, open-source models (Llama/Mistral) into strict JSON tool execution using constrained decoding techniques.
 
-Proof-of-concept implementations for next-generation AI communication:
+---
 
-*   **Model Context Protocol (MCP):** A standardized server exposing modular tools for dynamic discovery by any LLM client.
-    
-*   **Google A2A & Offline OSS:** Demonstrations of autonomous task delegation and forcing local, open-source models into deterministic JSON tool execution.
-    
+## 🛡️ Technical Hardening (Engineering Excellence)
+* **Zero-Hallucination Guardrails:** Tools are designed with strict "I don't know" fallbacks. If the RAG similarity score is below the safety margin, the system redirects to human support.
+* **Output Sanitization:** Implemented an interceptor layer to parse raw JSON tool-leaks, ensuring the UI only renders clean, professional natural language.
+* **Latency Benchmarking:** Every agentic turn is instrumented to track execution time across Router, Retrieval, and Generation phases.
 
-📂 Expected Outputs & Generated Artifacts
------------------------------------------
+---
 
-When executing the pipelines, the system will dynamically generate the following artifacts in your local environment:
+## 📸 System in Action (Technical Evidence)
 
-*   clinical\_checkpoints.sqlite: A persistent SQLite database storing comprehensive medical audit trails and multi-turn conversational memory.
-    
-*   data/clinical\_chroma\_db/: A local vector database directory containing hashed, isolated patient embeddings for the Clinical RAG.
-    
-*   data/US\_Bank\_FAQs.csv & data/US\_Bank\_Branches.csv: Real-world datasets structurally formatted and fetched dynamically via the automated ingestion script.
-    
+**1. Clinical Agent: Semantic Cache Hit (Sub-100ms)**
+> *[Insert Screenshot showing: "⏱️ Latency: 0.04s | Cache: ✅ Semantic Hit (Sim: 0.92)"]*
+![Clinical no cache](image/Clinical_cache.png)
+![Clinical cache](image/Clinical_miss.png)
+**2. Bank Agent: Autonomous Routing & Calculation**
+![Bank DIT](image/Bank_DTI.png)
+![Bank Location](image/Bank_Location.png)
 
-⚙️ Quickstart & Deployment (Google Colab / Local)
--------------------------------------------------
+**3. RAG Retrieval: Context-Aware FAQ**
+![Bank FQA](image/Bank_QA.png)
 
-**1. Clone the repository and install dependencies:**
+**4. Advanced Protocol Execution (Terminal)**
+![Demo Protocal](image/Demo_protocal.png)
+
+---
+
+## ⚙️ Quickstart & Deployment
+
+**1. Prerequisites:**
+```bash
+# Install Redis (Required for Clinical Semantic Cache)
+sudo apt-get install redis-server
+redis-server --daemonize yes
+```
+
+**2. Clone the repository and install dependencies:**
 
 ```bash
-git clone [https://github.com/YOUR_USERNAME/NextGen-Agentic-AI.git](https://github.com/YOUR_USERNAME/NextGen-Agentic-AI.git)
+git clone [https://github.com/cantricao/NextGen-Agentic-AI.git](https://github.com/cantricao/NextGen-Agentic-AI.git)
 cd NextGen-Agentic-AI
 pip install -r requirements.txt
 ```
 
-**2. Fetch Real-World Banking Datasets:** Populates the data directory with live FDIC and HuggingFace data.
+
+**3. Launch the Applications via Streamlit:** Ensure your .env contains your GOOGLE\_API\_KEY.
 
 ```bash
-python scripts/fetch_real_data.py
-```
-
-**3. Initialize Redis Server (Required for Clinical Cache):** Sets up the Redis daemon for the semantic caching layer.
-
-```bash
-# On Linux / Google Colab
-apt-get update -qq
-apt-get install -y redis-server -qq
-redis-server --daemonize yes
-```
-
-**4. Launch the Applications via Streamlit:** Ensure your .env contains your GOOGLE\_API\_KEY.
-
-```bash
-# Run the Medical Agent
+# Run Medical Agent (Multi-tenant RAG + Redis)
 streamlit run clinical_app.py
 
-# Run the Banking Agent
+# Run Banking Agent (Multi-agent Graph + FAISS)
 streamlit run bank_app.py
 ```
 
-**5. Execute Advanced Protocols (Terminal Demos):**
+**4. Execute Advanced Protocols (Terminal Demos):**
 To test the proof-of-concept architectures for MCP, Agent-to-Agent communication, and Offline Function Calling, run the following scripts directly in your terminal:
 ```bash
 # Test Model Context Protocol (MCP) initialization
@@ -103,18 +99,6 @@ python src/protocols/a2a_demo.py
 python src/oss_agents/local_function_caller.py
 ```
 
-## 📸 System in Action (Visual Outputs)
-
-*Below are the expected outputs when running the ecosystem:*
-
-**1. Clinical RAG Agent (Sub-100ms Redis Cache Hit)**
-> *[Insert Screenshot of Streamlit UI showing the Clinical Agent answering a medical query with the "⏱️ Latency: 0.05s | Cache: ✅ Hit" metric]*
-
-**2. Bank Multi-Agent Routing**
-> *[Insert Screenshot of Streamlit UI showing the Router delegating a loan calculation to the Loan Agent]*
-
-**3. Advanced Protocol Execution (Terminal)**
-> *[Insert Screenshot of Terminal logs demonstrating the MCP Server or Offline OSS Function Calling]*
 
 👨‍💻 About the Author
 ----------------------
