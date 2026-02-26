@@ -23,7 +23,7 @@ def router_node(state: BankAgentState) -> BankAgentState:
         "You are the Bank Router Agent. Analyze the user's request and classify it into exactly ONE of the following categories:\n"
         "1. 'loan_agent': If the user asks about calculating debt, applying for a loan, or DTI.\n"
         "2. 'faq_agent': If the user asks about branches, locations, interest rates, fees, or general bank info.\n"
-        "Output ONLY the exact category string (e.g., loan_agent or faq_agent)."
+        "Output ONLY the exact category string :loan_agent or faq_agent."
     )
     
     response = llm.invoke([
