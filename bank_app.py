@@ -35,7 +35,8 @@ if prompt := st.chat_input("Ask about loans, rates, or branch locations..."):
     st.session_state.bank_messages.append(HumanMessage(content=prompt))
     
     initial_state = {
-        "messages": st.session_state.bank_messages
+        "messages": st.session_state.bank_messages,
+        "user_location": "123 Magnificent Mile, Chicago"  # Example user location for branch locator agent
     }
     
     # Define configuration containing the thread_id for the MemorySaver
