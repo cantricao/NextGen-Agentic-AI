@@ -17,7 +17,8 @@ except Exception as e:
     redis_client = None
 
 class ClinicalSemanticCache:
-    def __init__(self, threshold: float = 0.75):
+    # Lowered threshold to 0.65 for better semantic matching with MiniLM
+    def __init__(self, threshold: float = 0.65):
         """
         Initializes the Semantic Cache with a cosine similarity threshold.
         Queries scoring above this threshold will trigger a cache hit.
@@ -44,6 +45,7 @@ class ClinicalSemanticCache:
         Returns the cached response if similarity exceeds the threshold.
         """
         if not redis_client:
+            print("[ERROR] Cannot check cache: Redis client is offline.")
             return None
 
         redis_key = self._get_namespace_key(patient_id)
@@ -67,6 +69,7 @@ class ClinicalSemanticCache:
                     best_response = data.get("response")
             except json.JSONDecodeError:
                 continue
+                
         print(f"[DEBUG] Highest similarity score found: {best_score:.4f}")
         
         if best_score >= self.threshold:
@@ -81,6 +84,7 @@ class ClinicalSemanticCache:
         in the Redis Hash, scoped to the patient ID.
         """
         if not redis_client:
+            print("[ERROR] Cannot store cache: Redis client is offline. Please start Redis server.")
             return
 
         redis_key = self._get_namespace_key(patient_id)

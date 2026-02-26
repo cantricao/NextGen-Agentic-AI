@@ -50,4 +50,4 @@ if prompt := st.chat_input("Ask about loans, rates, or branch locations..."):
         st.session_state.bank_messages.append(final_msg)
         
         # Display the intent routing for debugging/showcase purposes
-        st.caption(f"🔄 Routed via: {result.get('current_intent', 'UNKNOWN')}")
+        st.caption(f"🔄 Routed via: {result.get('next_route', 'UNKNOWN')}")
