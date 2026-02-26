@@ -1,18 +1,39 @@
 import os
 import json
-import pandas as pd
 from langchain_core.tools import tool
+from langchain_community.document_loaders.csv_loader import CSVLoader
+from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
 
-# Resolve the absolute path to the data directory
+# 1. Resolve absolute paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-
-# Load CSV files into memory during system startup
 faq_path = os.path.join(DATA_DIR, "US_Bank_FAQs.csv")
 branch_path = os.path.join(DATA_DIR, "US_Bank_Branches.csv")
 
-faq_df = pd.read_csv(faq_path) if os.path.exists(faq_path) else pd.DataFrame()
-branch_df = pd.read_csv(branch_path) if os.path.exists(branch_path) else pd.DataFrame()
+# 2. Initialize Embedding Model (Lightweight & Local)
+embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+# 3. Load and Vectorize Data (In-memory FAISS RAG)
+faq_retriever = None
+branch_retriever = None
+
+try:
+    if os.path.exists(faq_path):
+        faq_loader = CSVLoader(file_path=faq_path, encoding='utf-8')
+        faq_vectorstore = FAISS.from_documents(faq_loader.load(), embeddings)
+
+        faq_retriever = faq_vectorstore.as_retriever(search_kwargs={"k": 2})
+        print("[INFO] RAG: FAQ Vector Store initialized successfully.")
+
+    if os.path.exists(branch_path):
+        branch_loader = CSVLoader(file_path=branch_path, encoding='utf-8')
+        branch_vectorstore = FAISS.from_documents(branch_loader.load(), embeddings)
+
+        branch_retriever = branch_vectorstore.as_retriever(search_kwargs={"k": 1})
+        print("[INFO] RAG: Branch Vector Store initialized successfully.")
+except Exception as e:
+    print(f"[ERROR] Failed to initialize RAG Vector Stores: {e}")
 
 @tool
 def calculate_dti(monthly_income: float, monthly_debt: float) -> str:
@@ -32,41 +53,34 @@ def calculate_dti(monthly_income: float, monthly_debt: float) -> str:
 @tool
 def search_nearest_branch(user_location: str) -> str:
     """
-    Finds the nearest physical bank branch based on the user's current city or location.
-    Reads real data from US_Bank_Branches.csv.
+    Finds the nearest physical bank branch using Semantic Vector Search (RAG).
+    Handles natural language locations like "I'm near the windy city".
     """
-    if branch_df.empty:
-        return "Branch data system is currently under maintenance or missing CSV file."
+    if not branch_retriever:
+        return "System Error: Branch RAG engine is offline."
 
-    location_key = user_location.lower().strip()
+    # Perform similarity search
+    docs = branch_retriever.invoke(user_location)
     
-    # Scan for the location keyword across all columns in the CSV
-    mask = branch_df.apply(lambda row: row.astype(str).str.lower().str.contains(location_key).any(), axis=1)
-    results = branch_df[mask]
-
-    if not results.empty:
-        top_branch = results.iloc[0].to_dict()
-        return f"Found nearest branch: {top_branch}."
+    if docs:
+        return f"Nearest branch info retrieved from database:\n{docs[0].page_content}"
             
-    return "Cannot find a branch near your location. Please contact our hotline at 1900-xxxx."
+    return "Cannot find a branch near your location using semantic search."
 
 @tool
 def get_bank_faq(topic: str) -> str:
     """
-    Retrieves official bank policies, interest rates, and general FAQs.
-    Reads real data from US_Bank_FAQs.csv.
+    Retrieves official bank policies and FAQs using Semantic Vector Search (RAG).
+    Understands intent even if exact keywords don't match.
     """
-    if faq_df.empty:
-        return "Policy data system is currently under maintenance or missing CSV file."
+    if not faq_retriever:
+        return "System Error: FAQ RAG engine is offline."
 
-    topic_key = topic.lower().strip()
+    # Perform similarity search for FAQs
+    docs = faq_retriever.invoke(topic)
     
-    # Scan for the topic keyword across all columns in the CSV
-    mask = faq_df.apply(lambda row: row.astype(str).str.lower().str.contains(topic_key).any(), axis=1)
-    results = faq_df[mask]
-
-    if not results.empty:
-        answer = results.iloc[0].to_dict()
-        return f"Policy information: {answer}"
+    if docs:
+        context = "\n---\n".join([doc.page_content for doc in docs])
+        return f"Policy context retrieved from database:\n{context}"
         
-    return "I cannot find any policies related to your question. Please visit the bank's website."
+    return "I cannot find any policies related to your question in our vector database."
