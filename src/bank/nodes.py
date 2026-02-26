@@ -1,3 +1,4 @@
+from langchain_core.messages import ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from src.bank.state import BankAgentState
@@ -48,36 +49,71 @@ def router_node(state: BankAgentState) -> BankAgentState:
 def loan_agent_node(state: BankAgentState) -> BankAgentState:
     """
     The Loan Agent handles complex calculations and financial advice.
-    It has access to the calculate_dti tool.
+    It now autonomously executes tools and formulates a final response.
     """
     messages = state.get("messages", [])
-    
-    # Bind the specific tool to the LLM
     loan_llm = llm.bind_tools([calculate_dti])
     
     system_prompt = SystemMessage(
         content="You are a strict but helpful Loan Expert Agent. Use the calculate_dti tool if the user provides income and debt. Explain the risk clearly."
     )
     
-    # Invoke LLM with history
+    # 1. Ask the LLM to decide what to do
     response = loan_llm.invoke([system_prompt] + messages)
+    new_messages = [response]
     
-    return {"messages": [response], "current_agent": "loan_agent", "num_steps": state.get("num_steps", 0) + 1}
+    # 2. If the LLM decides to use a tool, execute it automatically!
+    if response.tool_calls:
+        for tool_call in response.tool_calls:
+            # Execute the correct tool
+            if tool_call["name"] == "calculate_dti":
+                tool_result = calculate_dti.invoke(tool_call["args"])
+            else:
+                tool_result = "Tool not recognized."
+            
+            # Pack the result into a ToolMessage
+            tool_msg = ToolMessage(content=str(tool_result), tool_call_id=tool_call["id"])
+            new_messages.append(tool_msg)
+        
+        # 3. Feed the tool's result back to the LLM so it can talk to the user
+        final_response = loan_llm.invoke([system_prompt] + messages + new_messages)
+        new_messages.append(final_response)
+        
+    return {"messages": new_messages, "current_agent": "loan_agent", "next_route": "loan_agent"}
+
 
 def faq_agent_node(state: BankAgentState) -> BankAgentState:
     """
     The FAQ Agent handles general inquiries and branch locations.
-    It has access to search_nearest_branch and get_bank_faq tools.
+    It now autonomously executes tools and formulates a final response.
     """
     messages = state.get("messages", [])
     location = state.get("user_location", "Unknown")
     
     faq_llm = llm.bind_tools([search_nearest_branch, get_bank_faq])
-    
     system_prompt = SystemMessage(
         content=f"You are a friendly Bank Support Agent. The user is currently located in {location}. Use your tools to answer their questions accurately."
     )
     
+    # 1. Ask the LLM to decide what to do
     response = faq_llm.invoke([system_prompt] + messages)
+    new_messages = [response]
     
-    return {"messages": [response], "current_agent": "faq_agent", "num_steps": state.get("num_steps", 0) + 1}
+    # 2. If the LLM decides to use a tool, execute it automatically!
+    if response.tool_calls:
+        for tool_call in response.tool_calls:
+            if tool_call["name"] == "search_nearest_branch":
+                tool_result = search_nearest_branch.invoke(tool_call["args"])
+            elif tool_call["name"] == "get_bank_faq":
+                tool_result = get_bank_faq.invoke(tool_call["args"])
+            else:
+                tool_result = "Tool not recognized."
+                
+            tool_msg = ToolMessage(content=str(tool_result), tool_call_id=tool_call["id"])
+            new_messages.append(tool_msg)
+            
+        # 3. Feed the tool's result back to the LLM to generate the final text
+        final_response = faq_llm.invoke([system_prompt] + messages + new_messages)
+        new_messages.append(final_response)
+
+    return {"messages": new_messages, "current_agent": "faq_agent", "next_route": "faq_agent"}
