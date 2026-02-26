@@ -4,6 +4,7 @@ langchain-google-genai
 langgraph
 langgraph-checkpoint-sqlite
 langchain_community
+langchain_huggingface
 
 # UI & Environment Setup
 streamlit
