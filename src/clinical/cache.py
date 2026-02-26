@@ -17,7 +17,7 @@ except Exception as e:
     redis_client = None
 
 class ClinicalSemanticCache:
-    def __init__(self, threshold: float = 0.85):
+    def __init__(self, threshold: float = 0.75):
         """
         Initializes the Semantic Cache with a cosine similarity threshold.
         Queries scoring above this threshold will trigger a cache hit.
@@ -62,13 +62,13 @@ class ClinicalSemanticCache:
                 cached_vector = data.get("embedding", [])
                 
                 score = self.cosine_similarity(query_vector, cached_vector)
-                
                 if score > best_score:
                     best_score = score
                     best_response = data.get("response")
             except json.JSONDecodeError:
                 continue
-                
+        print(f"[DEBUG] Highest similarity score found: {best_score:.4f}")
+        
         if best_score >= self.threshold:
             print(f"[DEBUG] Semantic Cache Hit! Similarity: {best_score:.4f}")
             return best_response

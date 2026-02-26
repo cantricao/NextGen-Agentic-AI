@@ -22,7 +22,7 @@ def router_node(state: BankAgentState) -> BankAgentState:
     system_prompt = (
         "You are the Bank Router Agent. Analyze the user's request and classify it into exactly ONE of the following categories:\n"
         "1. 'loan_agent': If the user asks about calculating debt, applying for a loan, or DTI.\n"
-        "2. 'faq_agent': If the user asks about branches, locations, interest rates, fees, or general bank info.\n"
+        "2. 'faq_agent': If the user asks about branches, locations, specific cities (e.g., 'Chicago', 'nearest branch'), ATMs, interest rates, fees, or general bank info.\n"
         "Output ONLY the exact category string :loan_agent or faq_agent."
     )
     
@@ -31,11 +31,17 @@ def router_node(state: BankAgentState) -> BankAgentState:
         HumanMessage(content=user_query)
     ])
     
-    route_decision = response.content.strip().lower()
+    # Bulletproof cleaning: aggressively strip all quotes, backticks, spaces, and newlines
+    route_decision = response.content.lower()
+    for char in ["`", '"', "'", "\n", " "]:
+        route_decision = route_decision.replace(char, "")    
     
     # Fallback mechanism
     if route_decision not in ["loan_agent", "faq_agent"]:
+        print(f"[WARNING] Invalid route parsed: '{route_decision}'. Defaulting to faq_agent.")
         route_decision = "faq_agent"
+    
+    print(f"🔄 Routed via: {route_decision}")
         
     return {"next_route": route_decision, "current_agent": "router"}
 
