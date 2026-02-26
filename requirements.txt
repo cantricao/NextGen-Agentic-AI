@@ -16,6 +16,7 @@ chromadb
 langchain-chroma
 sentence-transformers
 numpy
+faiss-cpu
 
 # Data Processing
 pandas
