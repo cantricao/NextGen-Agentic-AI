@@ -5,7 +5,6 @@ langgraph
 langgraph-checkpoint-sqlite
 langchain_community
 langchain_huggingface
-openai
 
 # UI & Environment Setup
 streamlit
@@ -30,5 +29,5 @@ datasets
 redis
 
 # Model Context Protocol (MCP) Infrastructure
-mcp
-fastmcp
+mcp[cli]
+openai-agents
