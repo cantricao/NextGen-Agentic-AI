@@ -31,8 +31,7 @@ load_dotenv()
 logging.basicConfig(level=logging.ERROR, format='%(message)s')
 
 # =====================================================================
-# 🛠️ COMPATIBILITY PATCH (Derived from official a2a_quickstart.ipynb)
-# Retained to ensure stability between google-adk==1.9.0 and a2a-sdk
+# 🛠️ COMPATIBILITY PATCH 
 # =====================================================================
 from a2a.client import client as real_client_module
 from a2a.client.card_resolver import A2ACardResolver
@@ -48,7 +47,7 @@ class PatchedClientModule:
 sys.modules['a2a.client.client'] = PatchedClientModule(real_client_module)  # type: ignore
 
 # =====================================================================
-# 1. ATOMIC TOOLS (Domain-Specific Functions)
+# 1. ATOMIC TOOLS 
 # =====================================================================
 def compute_dti(income: float, debt: float) -> str:
     """Calculates Debt-to-Income (DTI) ratio. Returns percentage and risk tier."""
@@ -78,7 +77,8 @@ loan_card = AgentCard(
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['text/plain'],
     preferred_transport=TransportProtocol.jsonrpc,
-    skills=[AgentSkill(id='calc_dti', name='Calculate DTI', description='Computes financial risk.')],
+    # FIXED: Added 'tags' parameter to satisfy Pydantic validation
+    skills=[AgentSkill(id='calc_dti', name='Calculate DTI', description='Computes financial risk.', tags=['finance', 'loan', 'calculator'])],
 )
 remote_loan_agent = RemoteA2aAgent(
     name='calc_dti_remote', description='Call this to calculate DTI or assess loan risk',
@@ -97,7 +97,8 @@ support_card = AgentCard(
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['text/plain'],
     preferred_transport=TransportProtocol.jsonrpc,
-    skills=[AgentSkill(id='find_branch', name='Find Branch', description='Locates branches.')],
+    # FIXED: Added 'tags' parameter
+    skills=[AgentSkill(id='find_branch', name='Find Branch', description='Locates branches.', tags=['support', 'location', 'search'])],
 )
 remote_support_agent = RemoteA2aAgent(
     name='find_branch_remote', description='Call this to find physical bank locations or hours',
@@ -105,7 +106,6 @@ remote_support_agent = RemoteA2aAgent(
 )
 
 # --- 2C. The Coordinator: Bank Manager (Port 10022) ---
-# OPTIMIZATION: Utilizing LlmAgent instead of SequentialAgent for autonomous semantic routing.
 coordinator_agent = LlmAgent(
     name='bank_manager_coordinator',
     model=MODEL,
@@ -122,14 +122,14 @@ coordinator_card = AgentCard(
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['application/json'],
     preferred_transport=TransportProtocol.jsonrpc,
-    skills=[AgentSkill(id='coordinate_request', name='Coordinate', description='Main entry point.')],
+    # FIXED: Added 'tags' parameter
+    skills=[AgentSkill(id='coordinate_request', name='Coordinate', description='Main entry point.', tags=['orchestration', 'routing'])],
 )
 
 # =====================================================================
-# 3. FAST SERVER LAUNCHER (Background Orchestration)
+# 3. FAST SERVER LAUNCHER 
 # =====================================================================
 def create_a2a_app(agent, agent_card):
-    """Encapsulates the ADK runner and A2A Starlette app creation."""
     runner = Runner(
         app_name=agent.name, agent=agent,
         artifact_service=InMemoryArtifactService(), session_service=InMemorySessionService(), memory_service=InMemoryMemoryService()
@@ -138,12 +138,10 @@ def create_a2a_app(agent, agent_card):
     return A2AStarletteApplication(agent_card=agent_card, http_handler=DefaultRequestHandler(agent_executor=executor, task_store=InMemoryTaskStore()))
 
 async def start_server(agent, agent_card, port):
-    """Deploys a single agent as an independent uvicorn microservice."""
     config = uvicorn.Config(create_a2a_app(agent, agent_card).build(), host='127.0.0.1', port=port, log_level='critical', loop='none')
     await uvicorn.Server(config).serve()
 
 def run_all_servers():
-    """Bootstraps the entire distributed agent topology in an isolated event loop."""
     nest_asyncio.apply()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -156,11 +154,9 @@ def run_all_servers():
     loop.run_until_complete(asyncio.gather(*tasks))
 
 # =====================================================================
-# 4. A2A CLIENT (End-to-End Execution Test)
+# 4. A2A CLIENT 
 # =====================================================================
 async def test_a2a_architecture():
-    """Simulates a user request hitting the Coordinator Agent via HTTP JSON-RPC."""
-    # Allow uvicorn servers to bind to their respective ports
     await asyncio.sleep(4)
     print("✅ [Status] All Microservices Online (Ports: 10020, 10021, 10022)")
     
@@ -168,12 +164,10 @@ async def test_a2a_architecture():
     print(f"\n👤 [User Query]: {user_query}")
     print("🤖 [Bank Manager]: Analyzing intent and routing to remote sub-agents via A2A Protocol...\n")
     
-    # Establish a pure A2A Client connection to the Bank Manager Coordinator (Port 10022)
     async with httpx.AsyncClient(timeout=120.0) as httpx_client:
         card_resp = await httpx_client.get(f'http://127.0.0.1:10022{AGENT_CARD_WELL_KNOWN_PATH}')
         client = ClientFactory(ClientConfig(httpx_client=httpx_client)).create(AgentCard(**card_resp.json()))
         
-        # Stream the message and await the synthesized response
         responses = [resp async for resp in client.send_message(create_text_message_object(content=user_query))]
         
         print("✅ [Final Synthesized Response from Bank Manager]:")
@@ -183,8 +177,5 @@ async def test_a2a_architecture():
             print("Failed to parse response artifact.")
 
 if __name__ == "__main__":
-    # 1. Spin up the microservices in a background daemon thread
     threading.Thread(target=run_all_servers, daemon=True).start()
-    
-    # 2. Trigger the client test in the main thread
     asyncio.run(test_a2a_architecture())
