@@ -115,18 +115,19 @@ remote_support_agent = RemoteA2aAgent(
 )
 
 # --- 2C. Bank Manager Coordinator (The Brain) ---
+# --- 2C. Bank Manager Coordinator (The Brain) ---
 coordinator_agent = LlmAgent(
     name='bank_manager_coordinator',
     model=COORDINATOR_MODEL,
     instruction="""You are the Executive Bank Manager orchestrating requests. 
-    The user query often contains MULTIPLE distinct questions (finance AND location).
+    The user query often contains MULTIPLE distinct questions (e.g., finance AND location).
     
-    CRITICAL INSTRUCTION:
-    1. You have a built-in tool called 'transfer_to_agent'. You MUST use it to delegate tasks!
-    2. Use 'transfer_to_agent' to route the math/financial part to 'calc_dti_remote'.
-    3. Use 'transfer_to_agent' to route the location part to 'find_branch_remote'.
-    4. DO NOT END THE CONVERSATION after calling just one tool. You must wait to receive the output from BOTH tools.
-    5. Once you have gathered ALL the answers from your sub-agents, synthesize a final, polite, integrated response in your own words.""",
+    CRITICAL FRAMEWORK RULE: 
+    If you call 'transfer_to_agent' sequentially (one by one), you will lose control of the conversation. 
+    To answer multi-part queries, you MUST use PARALLEL TOOL CALLING. 
+    You must call 'transfer_to_agent' for BOTH 'calc_dti_remote' AND 'find_branch_remote' SIMULTANEOUSLY in the exact same generation step.
+    
+    Do not wait between calls. Once both background tasks return, synthesize the final, polite, integrated response in your own words.""",
     sub_agents=[remote_loan_agent, remote_support_agent],
 )
 coordinator_card = AgentCard(
