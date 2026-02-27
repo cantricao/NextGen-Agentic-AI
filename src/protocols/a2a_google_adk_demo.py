@@ -50,34 +50,32 @@ class PatchedClientModule:
 sys.modules['a2a.client.client'] = PatchedClientModule(real_client_module) # type: ignore
 
 # =====================================================================
-# 1. LANGCHAIN TOOL ADAPTERS (Clean Architecture Integration)
+# 1. LANGCHAIN TOOL ADAPTERS (Fixed Mapping for NextGen-Agentic-AI)
 # =====================================================================
-# Import your actual LangChain tools from your separate tools module.
-# NOTE: Ensure these variable names match what you exported in bank_tools.py.
 try:
-    from src.bank.tools.bank_tools import compute_dti_tool, search_branch_tool
-except ImportError:
-    print("⚠️ Warning: Could not import tools from src.bank.tools.bank_tools. Ensure the file and variable names exist.")
+    # Mapping the exact function names from your src/bank/tools/bank_tools.py
+    from src.bank.tools.bank_tools import compute_dti, search_branch
+except ImportError as e:
+    print(f"⚠️ Import Error: {e}. Attempting path fix...")
+    # Dynamic path fix for Google Colab/Local execution
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+    from src.bank.tools.bank_tools import compute_dti, search_branch
 
 def adk_compute_dti(income: float, debt: float) -> str:
-    """Calculates Debt-to-Income (DTI) ratio. Returns percentage and risk tier.
-    This is a wrapper function allowing Google ADK to read the schema, 
-    while delegating the actual execution to the LangChain tool."""
+    """Calculates DTI by invoking the LangChain 'compute_dti' function."""
     try:
-        # Using LangChain's .invoke() method
-        return compute_dti_tool.invoke({"income": income, "debt": debt})
+        # Note: Your compute_dti is a @tool, so we use .invoke()
+        return compute_dti.invoke({"income": income, "debt": debt})
     except Exception as e:
-        return f"Error executing LangChain tool: {str(e)}"
+        return f"Error in LangChain DTI tool: {str(e)}"
 
 def adk_search_branch(city: str) -> str:
-    """Searches for the nearest operational bank branch based on city.
-    This is a wrapper function allowing Google ADK to read the schema, 
-    while delegating the actual execution to the LangChain tool."""
+    """Searches branch by invoking the LangChain 'search_branch' function."""
     try:
-        # Using LangChain's .invoke() method
-        return search_branch_tool.invoke({"city": city})
+        # Note: Your search_branch is a @tool, so we use .invoke()
+        return search_branch.invoke({"city": city})
     except Exception as e:
-        return f"Error executing LangChain tool: {str(e)}"
+        return f"Error in LangChain Branch tool: {str(e)}"
 
 # =====================================================================
 # 2. A2A MICROSERVICES (Cost-Optimized Routing Architecture)
