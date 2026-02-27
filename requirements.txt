@@ -31,3 +31,7 @@ redis
 # Model Context Protocol (MCP) Infrastructure
 mcp[cli]
 openai-agents
+
+# Google Agent-to-Agent (A2A) & ADK
+a2a-sdk[http-server]>=0.3.0
+uvicorn
