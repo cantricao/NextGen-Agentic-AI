@@ -1,4 +1,4 @@
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 from src.bank.tools.bank_tools import calculate_dti, search_nearest_branch, get_bank_faq
 
 # Initialize the FastMCP Server
