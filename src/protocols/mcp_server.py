@@ -52,4 +52,4 @@ def fetch_bank_faq(topic: str) -> str:
 if __name__ == "__main__":
     # Launch the server using Server-Sent Events (SSE) transport on Port 8000
     print("--- [Initializing FastMCP SSE Server on Port 8000] ---")
-    mcp.run(transport="sse", port=8000)
+    mcp.run(transport="sse")
