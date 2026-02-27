@@ -1,44 +1,55 @@
-"""
-Model Context Protocol (MCP) Server Implementation.
-This server exposes standard tools (e.g., weather lookup) that can be consumed 
-dynamically by any MCP-compatible LLM client (like OpenAI Agents or Gemini).
-"""
-import json
+from fastmcp import FastMCP
+from src.bank.tools.bank_tools import calculate_dti, search_nearest_branch, get_bank_faq
 
-class SimpleMCPServer:
-    def __init__(self, name="Weather_MCP_Server"):
-        self.name = name
-        self.registered_tools = {}
+# Initialize the FastMCP Server
+mcp = FastMCP("Enterprise-Bank-Server")
 
-    def register_tool(self, name, description, func):
-        self.registered_tools[name] = {
-            "description": description,
-            "callable": func
-        }
-
-    def execute_tool(self, tool_name, **kwargs):
-        if tool_name in self.registered_tools:
-            return self.registered_tools[tool_name]["callable"](**kwargs)
-        return json.dumps({"error": "Tool not found"})
-
-# Define a mock function (as seen in the original Colab)
-def get_current_temperature_by_city(city_name: str) -> str:
-    """Mock weather API returning static data for demonstration."""
-    return json.dumps({"city": city_name, "temperature": 20, "unit": "Celsius"})
-
-def main():
-    print("🚀 Starting MCP Server...")
-    server = SimpleMCPServer()
-    server.register_tool(
-        "get_current_temperature_by_city", 
-        "Get current temperature for a given city", 
-        get_current_temperature_by_city
+# ==========================================
+# 1. RESOURCES: Static Context for the LLM
+# ==========================================
+@mcp.resource("bank://compliance/core_principles")
+def get_compliance_guidelines() -> str:
+    """
+    Provides static, read-only compliance guidelines.
+    The LLM fetches this URI to understand business boundaries before acting.
+    """
+    return (
+        "BANK COMPLIANCE POLICY 2026:\n"
+        "1. Never guarantee loan approval without a DTI check.\n"
+        "2. Ensure all financial data is handled securely.\n"
+        "3. Protect user data privacy at all costs."
     )
-    
-    # Simulating an MCP Client request
-    print(f"Server '{server.name}' is running. Available tools: {list(server.registered_tools.keys())}")
-    result = server.execute_tool("get_current_temperature_by_city", city_name="Hanoi")
-    print(f"Tool Execution Result: {result}")
+
+# ==========================================
+# 2. PROMPTS: Standardized Execution Templates
+# ==========================================
+@mcp.prompt()
+def formal_loan_assessment(customer_name: str) -> str:
+    """
+    A standardized prompt template for generating official loan reports.
+    Instructs the Agent on exactly how to format its final response.
+    """
+    return (
+        f"Perform a formal loan risk assessment for {customer_name}. "
+        "Use the 'compute_dti' tool to calculate the risk based on the user's input. "
+        "Format your final response as an official bank letter, including the DTI ratio, "
+        "the risk tier, and a standard compliance disclaimer."
+    )
+
+# ==========================================
+# 3. TOOLS: Executable Functions
+# ==========================================
+@mcp.tool()
+def compute_dti(monthly_income: float, monthly_debt: float) -> str:
+    """Calculates the Debt-to-Income (DTI) ratio for financial risk assessment."""
+    return calculate_dti.invoke({"monthly_income": monthly_income, "monthly_debt": monthly_debt})
+
+@mcp.tool()
+def fetch_bank_faq(topic: str) -> str:
+    """Retrieves official bank policies using semantic RAG search."""
+    return get_bank_faq.invoke({"topic": topic})
 
 if __name__ == "__main__":
-    main()
+    # Launch the server using Server-Sent Events (SSE) transport on Port 8000
+    print("--- [Initializing FastMCP SSE Server on Port 8000] ---")
+    mcp.run(transport="sse", port=8000)
