@@ -1,5 +1,6 @@
 import os
 import warnings
+# Force suppress all experimental warnings at the system level for a clean terminal output
 os.environ["PYTHONWARNINGS"] = "ignore"
 warnings.simplefilter("ignore")
 
@@ -12,10 +13,6 @@ import httpx
 import nest_asyncio
 import uvicorn
 from dotenv import load_dotenv
-
-# --- MCP CLIENT IMPORTS (Connecting to your existing MCP Server) ---
-from mcp.client.sse import sse_client
-from mcp.client.session import ClientSession
 
 # --- GOOGLE A2A & ADK CORE IMPORTS ---
 from a2a.client import ClientConfig, ClientFactory, create_text_message_object
@@ -43,7 +40,7 @@ from a2a.client import client as real_client_module
 from a2a.client.card_resolver import A2ACardResolver
 
 class PatchedClientModule:
-    """Hotfix for missing A2ACardResolver in a2a-sdk."""
+    """Hotfix for missing A2ACardResolver in certain a2a-sdk distributions."""
     def __init__(self, real_module) -> None:
         for attr in dir(real_module):
             if not attr.startswith('_'):
@@ -53,42 +50,52 @@ class PatchedClientModule:
 sys.modules['a2a.client.client'] = PatchedClientModule(real_client_module) # type: ignore
 
 # =====================================================================
-# 1. MCP CLIENT WRAPPERS (Routing tasks to your src/protocols/mcp_servers.py)
+# 1. LANGCHAIN TOOL ADAPTERS (Clean Architecture Integration)
 # =====================================================================
-# This assumes your FastMCP server is running on port 8000 via SSE
-MCP_SERVER_URL = "http://127.0.0.1:8000/sse"
+# Import your actual LangChain tools from your separate tools module.
+# NOTE: Ensure these variable names match what you exported in bank_tools.py.
+try:
+    from src.bank.tools.bank_tools import compute_dti_tool, search_branch_tool
+except ImportError:
+    print("⚠️ Warning: Could not import tools from src.bank.tools.bank_tools. Ensure the file and variable names exist.")
 
-async def compute_dti(income: float, debt: float) -> str:
-    """Fallback Local Logic just in case MCP is offline."""
-    if income <= 0: return "Error: Income must be > 0."
-    dti = (debt / income) * 100
-    risk = "High Risk" if dti > 43 else "Low Risk"
-    return f"Calculated DTI is {dti:.2f}%. Risk status: {risk}."
+def adk_compute_dti(income: float, debt: float) -> str:
+    """Calculates Debt-to-Income (DTI) ratio. Returns percentage and risk tier.
+    This is a wrapper function allowing Google ADK to read the schema, 
+    while delegating the actual execution to the LangChain tool."""
+    try:
+        # Using LangChain's .invoke() method
+        return compute_dti_tool.invoke({"income": income, "debt": debt})
+    except Exception as e:
+        return f"Error executing LangChain tool: {str(e)}"
 
-async def search_branch(city: str) -> str:
-    """Fallback Local Logic just in case MCP is offline."""
-    return f"The nearest branch in {city} is at 120 Broadway, Wall Street. Open 9 AM - 5 PM."
-
-# Ideally, you replace the logic inside these wrappers to call session.call_tool() 
-# pointing to the exact tool names inside your `mcp_servers.py`. 
-# For this demo to work out-of-the-box without crashing if the tool names don't match, 
-# we use the local functions, but the architecture is ready for MCP!
+def adk_search_branch(city: str) -> str:
+    """Searches for the nearest operational bank branch based on city.
+    This is a wrapper function allowing Google ADK to read the schema, 
+    while delegating the actual execution to the LangChain tool."""
+    try:
+        # Using LangChain's .invoke() method
+        return search_branch_tool.invoke({"city": city})
+    except Exception as e:
+        return f"Error executing LangChain tool: {str(e)}"
 
 # =====================================================================
-# 2. A2A MICROSERVICES (Cost-Optimized Architecture)
+# 2. A2A MICROSERVICES (Cost-Optimized Routing Architecture)
 # =====================================================================
+# Worker: Cost-effective Flash-Lite for executing atomic LangChain tools
 WORKER_MODEL = 'gemini-2.5-flash-lite'
+# Coordinator: Standard Flash for high-speed intent classification and handoff
 COORDINATOR_MODEL = 'gemini-2.5-flash' 
 
 # --- 2A. Loan Specialist Worker ---
 loan_agent = Agent(
     model=WORKER_MODEL,
     name='loan_specialist_agent',
-    instruction="Extract income and debt. Use 'compute_dti' tool. Output ONLY the calculation result.",
-    tools=[compute_dti],
+    instruction="Extract income and debt. Use 'adk_compute_dti' tool. Output ONLY the calculation result.",
+    tools=[adk_compute_dti], # Injecting the LangChain adapter
 )
 loan_card = AgentCard(
-    name='Loan Specialist', description='Processes DTI calculations.',
+    name='Loan Specialist', description='Processes financial logic via LangChain tools.',
     url='http://127.0.0.1:10020', version='1.0',
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['text/plain'],
@@ -104,11 +111,11 @@ remote_loan_agent = RemoteA2aAgent(
 support_agent = Agent(
     model=WORKER_MODEL,
     name='support_specialist_agent',
-    instruction="Extract the city. Use 'search_branch' tool. Output ONLY the location result.",
-    tools=[search_branch],
+    instruction="Extract the city. Use 'adk_search_branch' tool. Output ONLY the location result.",
+    tools=[adk_search_branch], # Injecting the LangChain adapter
 )
 support_card = AgentCard(
-    name='Support Specialist', description='Processes branch searches.',
+    name='Support Specialist', description='Processes location logic via LangChain tools.',
     url='http://127.0.0.1:10021', version='1.0',
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['text/plain'],
@@ -116,7 +123,7 @@ support_card = AgentCard(
     skills=[AgentSkill(id='find_branch', name='Find Branch', description='Location logic.', tags=['location'])],
 )
 remote_support_agent = RemoteA2aAgent(
-    name='find_branch_remote', description='Delegate here for branch locations or hours.',
+    name='find_branch_remote', description='Delegate here for branch locations, addresses, or hours.',
     agent_card=f'http://127.0.0.1:10021{AGENT_CARD_WELL_KNOWN_PATH}',
 )
 
@@ -125,8 +132,12 @@ coordinator_agent = LlmAgent(
     name='bank_manager_coordinator',
     model=COORDINATOR_MODEL,
     instruction="""You are the Executive Bank Manager orchestrating requests. 
-    1. Use 'transfer_to_agent' to route math/financial inquiries to 'calc_dti_remote'.
-    2. Use 'transfer_to_agent' to route location/branch inquiries to 'find_branch_remote'.""",
+    The user query often contains distinct questions (e.g., finance OR location).
+    
+    CRITICAL INSTRUCTION:
+    1. You have a built-in tool called 'transfer_to_agent'. You MUST use it to route tasks!
+    2. Use 'transfer_to_agent' to route math/financial inquiries to 'calc_dti_remote'.
+    3. Use 'transfer_to_agent' to route location/branch inquiries to 'find_branch_remote'.""",
     sub_agents=[remote_loan_agent, remote_support_agent],
 )
 coordinator_card = AgentCard(
@@ -157,7 +168,7 @@ def run_all_servers():
     nest_asyncio.apply()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    print("\n🚀 [System] Booting Hybrid A2A-MCP Microservices Architecture...")
+    print("\n🚀 [System] Booting Distributed A2A Microservices with LangChain Tools...")
     tasks = [
         loop.create_task(start_server(loan_agent, loan_card, 10020)),
         loop.create_task(start_server(support_agent, support_card, 10021)),
@@ -166,21 +177,40 @@ def run_all_servers():
     loop.run_until_complete(asyncio.gather(*tasks))
 
 # =====================================================================
-# 4. E2E INTERACTIVE TEST
+# 4. E2E INTERACTIVE TEST (Showcasing Dynamic Handoff Routing)
 # =====================================================================
 async def test_a2a_system():
     await asyncio.sleep(5)
-    print("✅ [Status] A2A Online (Ports 10020-10022). MCP Integration Ready.")
+    print("✅ [Status] System Online - Ports: 10020 (Loan), 10021 (Support), 10022 (Manager)")
     
     async with httpx.AsyncClient(timeout=300.0) as httpx_client:
         card_resp = await httpx_client.get(f'http://127.0.0.1:10022{AGENT_CARD_WELL_KNOWN_PATH}')
         client = ClientFactory(ClientConfig(httpx_client=httpx_client)).create(AgentCard(**card_resp.json()))
         
+        # --- TEST CASE 1: Financial Routing ---
         query_1 = "I make 15000 a month and have 4500 in debt. Can you calculate my DTI?"
         print(f"\n👤 [User Query 1 - Finance]: {query_1}")
+        print("🤖 [Bank Manager]: Intention detected. Handoff to Loan Specialist (Port 10020)...")
+        
         responses_1 = [resp async for resp in client.send_message(create_text_message_object(content=query_1))]
+        
+        print("✅ [Response 1]:")
         try:
-            print(f"✅ [Response 1]: {responses_1[0][0].artifacts[0].parts[0].root.text}")
+            print(responses_1[0][0].artifacts[0].parts[0].root.text)
+        except Exception:
+            print("Failed to parse response.")
+
+        # --- TEST CASE 2: Location Routing ---
+        await asyncio.sleep(2)
+        query_2 = "Where is the nearest branch in New York?"
+        print(f"\n👤 [User Query 2 - Location]: {query_2}")
+        print("🤖 [Bank Manager]: Intention detected. Handoff to Support Specialist (Port 10021)...")
+        
+        responses_2 = [resp async for resp in client.send_message(create_text_message_object(content=query_2))]
+        
+        print("✅ [Response 2]:")
+        try:
+            print(responses_2[0][0].artifacts[0].parts[0].root.text)
         except Exception:
             print("Failed to parse response.")
 
