@@ -166,25 +166,43 @@ def run_all_servers():
     ]
     loop.run_until_complete(asyncio.gather(*tasks))
 
+# =====================================================================
+# 4. E2E INTERACTIVE TEST (Showcasing Dynamic Handoff Routing)
+# =====================================================================
 async def test_a2a_system():
     await asyncio.sleep(5)
-    print("✅ [Status] System Online - Ports: 10020, 10021, 10022")
-    
-    user_query = "Hello Manager! I make 15000 a month and have 4500 in debt. Can you calculate my DTI? Also, where is the nearest branch in New York?"
-    print(f"\n👤 [User Query]: {user_query}")
-    print("🤖 [Bank Manager]: Executing multi-agent delegation using Gemini 3.1 Pro...\n")
+    print("✅ [Status] System Online - Ports: 10020 (Loan), 10021 (Support), 10022 (Manager)")
     
     async with httpx.AsyncClient(timeout=300.0) as httpx_client:
         card_resp = await httpx_client.get(f'http://127.0.0.1:10022{AGENT_CARD_WELL_KNOWN_PATH}')
         client = ClientFactory(ClientConfig(httpx_client=httpx_client)).create(AgentCard(**card_resp.json()))
         
-        responses = [resp async for resp in client.send_message(create_text_message_object(content=user_query))]
+        # --- TEST CASE 1:---
+        query_1 = "I make 15000 a month and have 4500 in debt. Can you calculate my DTI?"
+        print(f"\n👤 [User Query 1 - Finance]: {query_1}")
+        print("🤖 [Bank Manager]: Intention detected. Handoff to Loan Specialist (Port 10020)...")
         
-        print("✅ [Final Synthesized Response]:")
+        responses_1 = [resp async for resp in client.send_message(create_text_message_object(content=query_1))]
+        
+        print("✅ [Response 1]:")
         try:
-            print(responses[0][0].artifacts[0].parts[0].root.text)
-        except:
-            print("Response extraction failed. Ensure your API Key has access to Gemini 3.1 Preview models.")
+            print(responses_1[0][0].artifacts[0].parts[0].root.text)
+        except Exception:
+            print("Failed to parse response.")
+
+        # --- TEST CASE 2:  ---
+        await asyncio.sleep(2) # Simulate user taking time to ask next question
+        query_2 = "Where is the nearest branch in New York?"
+        print(f"\n👤 [User Query 2 - Location]: {query_2}")
+        print("🤖 [Bank Manager]: Intention detected. Handoff to Support Specialist (Port 10021)...")
+        
+        responses_2 = [resp async for resp in client.send_message(create_text_message_object(content=query_2))]
+        
+        print("✅ [Response 2]:")
+        try:
+            print(responses_2[0][0].artifacts[0].parts[0].root.text)
+        except Exception:
+            print("Failed to parse response.")
 
 if __name__ == "__main__":
     threading.Thread(target=run_all_servers, daemon=True).start()
