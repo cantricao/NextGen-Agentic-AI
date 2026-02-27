@@ -73,11 +73,13 @@ loan_agent = Agent(
     tools=[compute_dti],
 )
 loan_card = AgentCard(
-    name='Loan Specialist', url='http://127.0.0.1:10020', version='1.0',
+    name='Loan Specialist', 
+    description='Calculates financial risk and DTI ratios.', # FIXED: Added required description
+    url='http://127.0.0.1:10020', 
+    version='1.0',
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['text/plain'],
     preferred_transport=TransportProtocol.jsonrpc,
-    # FIXED: Added 'tags' parameter to satisfy Pydantic validation
     skills=[AgentSkill(id='calc_dti', name='Calculate DTI', description='Computes financial risk.', tags=['finance', 'loan', 'calculator'])],
 )
 remote_loan_agent = RemoteA2aAgent(
@@ -93,11 +95,13 @@ support_agent = Agent(
     tools=[search_branch],
 )
 support_card = AgentCard(
-    name='Support Specialist', url='http://127.0.0.1:10021', version='1.0',
+    name='Support Specialist', 
+    description='Finds physical bank branch locations.', # FIXED: Added required description
+    url='http://127.0.0.1:10021', 
+    version='1.0',
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['text/plain'],
     preferred_transport=TransportProtocol.jsonrpc,
-    # FIXED: Added 'tags' parameter
     skills=[AgentSkill(id='find_branch', name='Find Branch', description='Locates branches.', tags=['support', 'location', 'search'])],
 )
 remote_support_agent = RemoteA2aAgent(
@@ -118,11 +122,13 @@ coordinator_agent = LlmAgent(
     sub_agents=[remote_loan_agent, remote_support_agent],
 )
 coordinator_card = AgentCard(
-    name='Bank Manager', url='http://127.0.0.1:10022', version='1.0',
+    name='Bank Manager', 
+    description='Main entry point that routes user queries to the correct sub-agent.', # FIXED: Added required description
+    url='http://127.0.0.1:10022', 
+    version='1.0',
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['application/json'],
     preferred_transport=TransportProtocol.jsonrpc,
-    # FIXED: Added 'tags' parameter
     skills=[AgentSkill(id='coordinate_request', name='Coordinate', description='Main entry point.', tags=['orchestration', 'routing'])],
 )
 
