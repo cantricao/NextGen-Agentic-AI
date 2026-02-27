@@ -54,7 +54,7 @@ Proof-of-concept implementations for standardized AI communication:
 ![Bank FQA](image/Bank_QA.png)
 
 **4. Advanced Protocol Execution (Terminal)**
-![Demo Protocal](image/Demo_protocal.png)
+![Demo Protocal](image/Demo_Protocal.png)
 
 ---
 
@@ -87,18 +87,17 @@ streamlit run bank_app.py
 ```
 
 **4. Execute Advanced Protocols (Terminal Demos):**
-To test the proof-of-concept architectures for MCP, Agent-to-Agent communication, and Offline Function Calling, run the following scripts directly in your terminal:
+
 ```bash
-# Test Model Context Protocol (MCP) initialization
+# Terminal 1: Start the SSE Server in the background
 python src/protocols/mcp_server.py
 
-# Test Google Agent-to-Agent (A2A) delegation
-python src/protocols/a2a_demo.py
+# Terminal 2: Run the Protocol Integration Test (Verifies network and MCP capabilities)
+python tests/protocols/test_mcp_manual.py
 
-# Test Offline/Local OSS Function Calling logic
-python src/oss_agents/local_function_caller.py
+# Terminal 3: Launch the Autonomous Interactive Agent Client
+python src/protocols/mcp_agent_client.py
 ```
-
 
 👨‍💻 About the Author
 ----------------------
