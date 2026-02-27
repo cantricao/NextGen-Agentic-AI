@@ -1,10 +1,9 @@
 # 🚀 NextGen Agentic AI Ecosystem: Enterprise Multi-Agent & RAG Infrastructure
 
 ## 📌 Executive Summary
-An enterprise-grade, multi-agent AI ecosystem demonstrating high-performance orchestration, real-time tool execution, and privacy-centric data retrieval. This repository moves beyond basic wrappers to implement **Stateful Graphs, Semantic Caching, and Multi-tenant Vector Isolation.**
+An enterprise-grade, multi-agent AI ecosystem demonstrating high-performance orchestration, real-time tool execution, and privacy-centric data retrieval. This repository moves beyond basic wrappers to implement **Stateful Graphs, Semantic Caching, and and Distributed Agentic Protocols.**
 
 Engineered for production-readiness, the architecture focuses on **Deterministic Execution**, **Sub-second Latency**, and **Zero-Hallucination** guardrails, specifically tailored for Healthcare and Financial domains.
-
 
 
 ---
@@ -14,7 +13,7 @@ Engineered for production-readiness, the architecture focuses on **Deterministic
 ### 1. 🏥 Clinical RAG Agent (Privacy-First & High-Performance)
 A specialized healthcare assistant designed for Electronic Health Records (EHR) with strict security boundaries.
 
-* **Redis-Backed Semantic Caching:** Implements a vector-similarity cache layer using `sentence-transformers`. It intercepts repeated queries by calculating **Cosine Similarity (Threshold: 0.75)**, reducing API latency from **~3.0s to <100ms** and cutting LLM token costs significantly.
+* **Redis-Backed Semantic Caching:** Implements a vector-similarity cache layer using `sentence-transformers`. It reduces API latency from **~3.0s to <100ms** for repeated queries.
 * **Multi-tenant Data Isolation:** Leverages **ChromaDB** with dynamic **Metadata Filtering**. Patient records are logically isolated using unique hashed identifiers, ensuring that the Retrieval phase never leaks data across different patient contexts.
 * **Audit-Ready Checkpoints:** Integrated with LangGraph’s `SqliteSaver` to persist conversation states, providing a compliant audit trail for medical interactions.
 
@@ -27,11 +26,9 @@ A fully autonomous coordinator that manages financial inquiries through strict i
 * **Conversational Persistence:** Employs `MemorySaver` to maintain thread-specific context, allowing the agent to handle complex, multi-turn follow-up questions.
 
 ### 3. 🔌 Advanced Agentic Protocols (Next-Gen PoC)
-Proof-of-concept implementations for standardized, decoupled AI communication located in `src/protocols/`
-* **Model Context Protocol (MCP) over SSE:** A decoupled Client-Server architecture allowing LLMs to dynamically discover and execute remote tools via RPC.
-* **Agent-to-Agent (A2A) Hierarchical Delegation:** Implements a Supervisor Agent (Bank Manager) that autonomously routes tasks to specialized Worker Agents (Loan Specialist, Support Specialist) to prevent context window overload.
+Located in `src/protocols/`, this section showcases the future of decoupled AI communication.
 
-* **Dual Client Approaches:** Includes both low-level native OpenAI SDK integration (`llm_call_mcp_sse.py`) and high-level framework orchestration (`agent_call_mcp_sse.py`).
+* **Model Context Protocol (MCP) over SSE:** A decoupled Client-Server architecture allowing LLMs to dynamically discover and execute remote tools via RPC. Includes both low-level native OpenAI SDK integration (`llm_call_mcp_sse.py`) and high-level framework orchestration (`agent_call_mcp_sse.py`).
 ```Plain text
 +-------------------+        Server-Sent Events (SSE)         +-----------------------+
 |   LLM / Agent     | --------------------------------------> |    FastMCP Server     |
@@ -41,12 +38,47 @@ Proof-of-concept implementations for standardized, decoupled AI communication lo
                                                                       |       |
                                                                 [Bank_Tools] [Vector_DB]
 ```
+* **Distributed A2A Microservices (Google ADK + LangChain):** Implements a hierarchical delegation model where a Coordinator routes tasks to specialized Workers across different network ports. Successfully bridged Google ADK (Proprietary Orchestration) with LangChain-based tools (Open-source Execution) via custom Function Adapters, ensuring sub-second execution and high modularity.
+
+```Plain text
++-----------------------------------------------------------------------+
+|                         USER / TEST SCRIPT                            |
++-----------------------------------+-----------------------------------+
+                                    |
+                          (HTTP / JSON-RPC)
+                                    v
++-----------------------------------------------------------------------+
+|                BANK MANAGER COORDINATOR (Port 10022)                  |
+|                   Model: gemini-2.5-flash                             |
+|       (Intent Classification & Dynamic Task Delegation)               |
++-----------------------+-----------------------+-----------------------+
+                        |                       |
+             [Intent: Finance]          [Intent: Location]
+             [Handoff to 10020]         [Handoff to 10021]
+                        |                       |
+                        v                       v
++------------------------------+       +------------------------------+
+|   LOAN SPECIALIST WORKER     |       |  SUPPORT SPECIALIST WORKER   |
+|     (Port 10020)             |       |     (Port 10021)             |
++--------------+---------------+       +--------------+---------------+
+               |                                      |
+       (ADK Tool Adapter)                     (ADK Tool Adapter)
+               |                                      |
+               v                                      v
++------------------------------+       +------------------------------+
+|     LANGCHAIN TOOLS          |       |      LANGCHAIN TOOLS         |
+|   (src.bank.tools.bank_tools)|       |  (src.bank.tools.bank_tools) |
++------------------------------+       +------------------------------+
+|  > calculate_dti.invoke()    |       | > search_nearest_branch()    |
++------------------------------+       +------------------------------+
+```
 ---
 
 ## 🛡️ Technical Hardening (Engineering Excellence)
 * **Zero-Hallucination Guardrails:** Tools are designed with strict "I don't know" fallbacks. If the RAG similarity score is below the safety margin, the system redirects to human support.
-* **Output Sanitization:** Implemented an interceptor layer to parse raw JSON tool-leaks, ensuring the UI only renders clean, professional natural language.
+* **Model Tiering:** Strategically uses `gemini-2.5-flash` for coordination and `gemini-2.5-flash-lite` for cost-efficient tool execution.
 * **Infrastructure Testing:** Built a strict, non-LLM integration test suite (`test_mcp_manual.py`) to verify network and protocol layers before generative model deployment.
+
 
 ---
 
@@ -63,7 +95,7 @@ Proof-of-concept implementations for standardized, decoupled AI communication lo
 **3. Advanced Protocol Execution (Terminal Demo)**
 ![llm call mcp](image/llm_call_mcp.png)
 ![agents call mcp](image/agents_call_mcp.png)
-
+![A2A Demo](image/A2A_demo.png)
 
 ---
 
@@ -106,6 +138,9 @@ python -m src.protocols.llm_call_mcp_sse
 
 # Terminal 4: Run high-level ReAct Agent
 python -m src.protocols.mcp_agent_client
+
+# Terminal 5: A2A Distributed Demo
+python -m src.protocols.a2a_google_adk_demo
 ```
 
 👨‍💻 About the Author
