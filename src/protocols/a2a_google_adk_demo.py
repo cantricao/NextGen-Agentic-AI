@@ -65,7 +65,7 @@ def search_branch(city: str) -> str:
 # 2. A2A MICROSERVICES (Next-Gen Gemini 3.x Series)
 # =====================================================================
 # Using Gemini 3.0 Flash for cost-effective speed, and 3.1 Pro Preview for deep reasoning
-WORKER_MODEL = 'gemini-3.0-flash'
+WORKER_MODEL = 'gemini-3.0-flash-preview'
 COORDINATOR_MODEL = 'gemini-3.1-pro-preview' 
 
 # --- 2A. Loan Specialist Worker ---
