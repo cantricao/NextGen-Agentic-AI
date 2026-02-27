@@ -4,11 +4,16 @@ import os
 import sys
 import threading
 import time
+import warnings # ADDED: To suppress experimental warnings
 
 import httpx
 import nest_asyncio
 import uvicorn
 from dotenv import load_dotenv
+
+# --- SUPPRESS EXPERIMENTAL WARNINGS ---
+warnings.filterwarnings("ignore", category=UserWarning, module="google.adk")
+warnings.filterwarnings("ignore", category=UserWarning, module="a2a")
 
 # --- GOOGLE A2A & ADK CORE IMPORTS ---
 from a2a.client import ClientConfig, ClientFactory, create_text_message_object
@@ -26,7 +31,6 @@ from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 
-# Load environment variables (Ensure GOOGLE_API_KEY / GEMINI_API_KEY is set)
 load_dotenv()
 logging.basicConfig(level=logging.ERROR, format='%(message)s')
 
@@ -37,7 +41,6 @@ from a2a.client import client as real_client_module
 from a2a.client.card_resolver import A2ACardResolver
 
 class PatchedClientModule:
-    """Hotfix for missing A2ACardResolver in certain a2a-sdk distributions."""
     def __init__(self, real_module) -> None:
         for attr in dir(real_module):
             if not attr.startswith('_'):
@@ -50,14 +53,12 @@ sys.modules['a2a.client.client'] = PatchedClientModule(real_client_module)  # ty
 # 1. ATOMIC TOOLS 
 # =====================================================================
 def compute_dti(income: float, debt: float) -> str:
-    """Calculates Debt-to-Income (DTI) ratio. Returns percentage and risk tier."""
     if income <= 0: return "Error: Income must be > 0."
     dti = (debt / income) * 100
     risk = "High Risk" if dti > 43 else "Low Risk"
     return f"Calculated DTI is {dti:.2f}%. Risk status: {risk}."
 
 def search_branch(city: str) -> str:
-    """Searches for the nearest operational bank branch."""
     return f"The Wall Street branch in {city} is open 9 AM to 5 PM."
 
 # =====================================================================
@@ -65,71 +66,67 @@ def search_branch(city: str) -> str:
 # =====================================================================
 MODEL = 'gemini-2.5-flash'
 
-# --- 2A. Remote Worker 1: Loan Specialist (Port 10020) ---
+# --- 2A. Loan Specialist ---
 loan_agent = Agent(
     model=MODEL,
     name='loan_specialist_agent',
-    instruction="You are a Loan Specialist. Use 'compute_dti' tool strictly for financial risk assessment.",
+    instruction="You are a Loan Specialist. Extract income and debt. Always use 'compute_dti' tool to answer.",
     tools=[compute_dti],
 )
 loan_card = AgentCard(
-    name='Loan Specialist', 
-    description='Calculates financial risk and DTI ratios.', # FIXED: Added required description
-    url='http://127.0.0.1:10020', 
-    version='1.0',
+    name='Loan Specialist', description='Calculates financial risk and DTI ratios.',
+    url='http://127.0.0.1:10020', version='1.0',
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['text/plain'],
     preferred_transport=TransportProtocol.jsonrpc,
-    skills=[AgentSkill(id='calc_dti', name='Calculate DTI', description='Computes financial risk.', tags=['finance', 'loan', 'calculator'])],
+    skills=[AgentSkill(id='calc_dti', name='Calculate DTI', description='Computes financial risk.', tags=['finance', 'loan'])],
 )
 remote_loan_agent = RemoteA2aAgent(
-    name='calc_dti_remote', description='Call this to calculate DTI or assess loan risk',
+    name='calc_dti_remote', description='Call this agent to calculate DTI or assess loan risk.',
     agent_card=f'http://127.0.0.1:10020{AGENT_CARD_WELL_KNOWN_PATH}',
 )
 
-# --- 2B. Remote Worker 2: Support Specialist (Port 10021) ---
+# --- 2B. Support Specialist ---
 support_agent = Agent(
     model=MODEL,
     name='support_specialist_agent',
-    instruction="You are a Support Guide. Use 'search_branch' tool to find bank locations.",
+    instruction="You are a Support Guide. Always use 'search_branch' tool to find bank locations in the requested city.",
     tools=[search_branch],
 )
 support_card = AgentCard(
-    name='Support Specialist', 
-    description='Finds physical bank branch locations.', # FIXED: Added required description
-    url='http://127.0.0.1:10021', 
-    version='1.0',
+    name='Support Specialist', description='Finds physical bank branch locations.',
+    url='http://127.0.0.1:10021', version='1.0',
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['text/plain'],
     preferred_transport=TransportProtocol.jsonrpc,
-    skills=[AgentSkill(id='find_branch', name='Find Branch', description='Locates branches.', tags=['support', 'location', 'search'])],
+    skills=[AgentSkill(id='find_branch', name='Find Branch', description='Locates branches.', tags=['support', 'location'])],
 )
 remote_support_agent = RemoteA2aAgent(
-    name='find_branch_remote', description='Call this to find physical bank locations or hours',
+    name='find_branch_remote', description='Call this agent to find physical bank locations or branch hours.',
     agent_card=f'http://127.0.0.1:10021{AGENT_CARD_WELL_KNOWN_PATH}',
 )
 
-# --- 2C. The Coordinator: Bank Manager (Port 10022) ---
+# --- 2C. The Coordinator: Bank Manager ---
+# FIXED: Stronger prompt engineering to force multi-tool invocation
 coordinator_agent = LlmAgent(
     name='bank_manager_coordinator',
     model=MODEL,
     instruction="""
-    You are the Bank Manager Coordinator. You receive requests from customers.
-    Route financial/loan queries to the 'calc_dti_remote' sub-agent.
-    Route location/branch queries to the 'find_branch_remote' sub-agent.
-    Synthesize all gathered information into a final, professional response.
+    You are the central Bank Manager Coordinator. You must analyze the user's entire prompt.
+    If the prompt contains MULTIPLE requests (e.g., a financial calculation AND a location search), 
+    you MUST call BOTH the 'calc_dti_remote' AND 'find_branch_remote' sub-agents before answering.
+    Do NOT answer the question yourself. Delegate the tasks to the sub-agents, gather their responses, 
+    and synthesize a final cohesive reply.
     """,
     sub_agents=[remote_loan_agent, remote_support_agent],
 )
 coordinator_card = AgentCard(
-    name='Bank Manager', 
-    description='Main entry point that routes user queries to the correct sub-agent.', # FIXED: Added required description
-    url='http://127.0.0.1:10022', 
-    version='1.0',
+    name='Bank Manager', description='Main entry point. Routes to correct sub-agents.',
+    url='http://127.0.0.1:10022', version='1.0',
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['application/json'],
     preferred_transport=TransportProtocol.jsonrpc,
-    skills=[AgentSkill(id='coordinate_request', name='Coordinate', description='Main entry point.', tags=['orchestration', 'routing'])],
+    skills=[AgentSkill(id='coordinate_request', name='Coordinate', description='Entry point.', tags=['routing'])],
 )
 
 # =====================================================================
@@ -176,7 +173,7 @@ async def test_a2a_architecture():
         
         responses = [resp async for resp in client.send_message(create_text_message_object(content=user_query))]
         
-        print("✅ [Final Synthesized Response from Bank Manager]:")
+        print("✅ [Final Synthesized Response]:")
         try:
             print(responses[0][0].artifacts[0].parts[0].root.text)
         except Exception:
