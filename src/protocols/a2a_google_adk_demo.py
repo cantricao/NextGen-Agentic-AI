@@ -112,17 +112,14 @@ remote_support_agent = RemoteA2aAgent(
 )
 
 # --- 2C. The Coordinator: Bank Manager (Port 10022) ---
-# FIX: Upgraded to PRO model and strictly enforced query decomposition
 coordinator_agent = LlmAgent(
     name='bank_manager_coordinator',
     model=COORDINATOR_MODEL,
     instruction="""
-    You are the Bank Manager Orchestrator. The user query will contain multiple distinct requests.
-    CRITICAL INSTRUCTION: You MUST decompose the prompt and call the sub-agents sequentially.
-    Step 1: Send ONLY the financial data to 'calc_dti_remote' and wait for the response.
-    Step 2: Send ONLY the location data to 'find_branch_remote' and wait for the response.
-    Step 3: Combine both answers into a single, polite response for the user.
-    Do NOT let one sub-agent handle the entire query.
+    You are the Bank Manager Orchestrator. The user query contains TWO distinct requests: a financial calculation AND a location search.
+    
+    CRITICAL: You MUST use BOTH available tools ('calc_dti_remote' AND 'find_branch_remote') to gather all necessary information. 
+    Do NOT generate your final response until you have successfully retrieved BOTH the DTI calculation AND the branch location.
     """,
     sub_agents=[remote_loan_agent, remote_support_agent],
 )
