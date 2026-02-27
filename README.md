@@ -3,7 +3,7 @@
 ## 📌 Executive Summary
 An enterprise-grade, multi-agent AI ecosystem demonstrating high-performance orchestration, real-time tool execution, and privacy-centric data retrieval. This repository moves beyond basic wrappers to implement **Stateful Graphs, Semantic Caching, and Multi-tenant Vector Isolation.**
 
-Engineered for production-readiness, the architecture focuses on **Deterministic Execution**, **Sub-second Latency**, and **Zero-Hallucination** guardrails.
+Engineered for production-readiness, the architecture focuses on **Deterministic Execution**, **Sub-second Latency**, and **Zero-Hallucination** guardrails, specifically tailored for Healthcare and Financial domains.
 
 
 
@@ -24,37 +24,46 @@ A fully autonomous coordinator that manages financial inquiries through strict i
 * **Stateful Agentic Routing:** Uses **LangGraph** to manage a directed acyclic graph (DAG). The **Semantic Router** classifies intents (Loan vs. FAQ) to prevent cross-domain contamination.
 * **Deterministic Tool Execution:** * **Loan Agent:** Extracts financial entities to execute a deterministic `calculate_dti` tool.
     * **FAQ Agent:** Utilizes an in-memory **FAISS** vector store for blazingly fast retrieval of banking policies from CSV datasets.
-* **Conversational Persistence:** Employs `MemorySaver` to maintain thread-specific context, allowing the agent to handle complex, multi-turn follow-up questions (e.g., "I need to deposit some cash today. Where is the nearest branch to me?").
+* **Conversational Persistence:** Employs `MemorySaver` to maintain thread-specific context, allowing the agent to handle complex, multi-turn follow-up questions.
 
 ### 3. 🔌 Advanced Agentic Protocols (Next-Gen PoC)
-Proof-of-concept implementations for standardized AI communication:
-* **Model Context Protocol (MCP):** Implements a Client-Server architecture allowing LLMs to dynamically discover and bind modular banking tools at runtime.
-* **Offline OSS Function Calling:** Forces local, open-source models (Llama/Mistral) into strict JSON tool execution using constrained decoding techniques.
+Proof-of-concept implementations for standardized, decoupled AI communication located in `src/protocols/`
+* **Model Context Protocol (MCP) over SSE:** A decoupled Client-Server architecture allowing LLMs to dynamically discover and execute remote tools via RPC.
+* **Agent-to-Agent (A2A) Hierarchical Delegation:** Implements a Supervisor Agent (Bank Manager) that autonomously routes tasks to specialized Worker Agents (Loan Specialist, Support Specialist) to prevent context window overload.
 
+* **Dual Client Approaches:** Includes both low-level native OpenAI SDK integration (`llm_call_mcp_sse.py`) and high-level framework orchestration (`agent_call_mcp_sse.py`).
+```Plain text
++-------------------+        Server-Sent Events (SSE)         +-----------------------+
+|   LLM / Agent     | --------------------------------------> |    FastMCP Server     |
+|   (The Brain)     | <-------------------------------------- |  (The Infrastructure) |
+|                   |        JSON-RPC Tool Execution          |                       |
++-------------------+                                         +-------+-------+-------+
+                                                                      |       |
+                                                                [Bank_Tools] [Vector_DB]
+```
 ---
 
 ## 🛡️ Technical Hardening (Engineering Excellence)
 * **Zero-Hallucination Guardrails:** Tools are designed with strict "I don't know" fallbacks. If the RAG similarity score is below the safety margin, the system redirects to human support.
 * **Output Sanitization:** Implemented an interceptor layer to parse raw JSON tool-leaks, ensuring the UI only renders clean, professional natural language.
-* **Latency Benchmarking:** Every agentic turn is instrumented to track execution time across Router, Retrieval, and Generation phases.
+* **Infrastructure Testing:** Built a strict, non-LLM integration test suite (`test_mcp_manual.py`) to verify network and protocol layers before generative model deployment.
 
 ---
 
 ## 📸 System in Action (Technical Evidence)
 
 **1. Clinical Agent: Semantic Cache Hit (Sub-100ms)**
-> *[Insert Screenshot showing: "⏱️ Latency: 0.04s | Cache: ✅ Semantic Hit (Sim: 0.92)"]*
 ![Clinical no cache](image/Clinical_cache.png)
 ![Clinical cache](image/Clinical_miss.png)
 **2. Bank Agent: Autonomous Routing & Calculation**
 ![Bank DIT](image/Bank_DTI.png)
 ![Bank Location](image/Bank_Location.png)
-
-**3. RAG Retrieval: Context-Aware FAQ**
 ![Bank FQA](image/Bank_QA.png)
 
-**4. Advanced Protocol Execution (Terminal)**
-![Demo Protocal](image/Demo_Protocal.png)
+**3. Advanced Protocol Execution (Terminal Demo)**
+![llm call mcp](image/llm_call_mcp.png)
+![agents call mcp](image/agents_call_mcp.png)
+
 
 ---
 
@@ -65,18 +74,15 @@ Proof-of-concept implementations for standardized AI communication:
 # Install Redis (Required for Clinical Semantic Cache)
 sudo apt-get install redis-server
 redis-server --daemonize yes
-```
 
-**2. Clone the repository and install dependencies:**
-
-```bash
+# Clone the repository and install dependencies
 git clone [https://github.com/cantricao/NextGen-Agentic-AI.git](https://github.com/cantricao/NextGen-Agentic-AI.git)
 cd NextGen-Agentic-AI
 pip install -r requirements.txt
 ```
 
 
-**3. Launch the Applications via Streamlit:** Ensure your .env contains your GOOGLE\_API\_KEY.
+**2. Launch the Applications via Streamlit:** Ensure your .env contains your GOOGLE\_API\_KEY or GEMINI\_API\_KEY.
 
 ```bash
 # Run Medical Agent (Multi-tenant RAG + Redis)
@@ -86,17 +92,20 @@ streamlit run clinical_app.py
 streamlit run bank_app.py
 ```
 
-**4. Execute Advanced Protocols (Terminal Demos):**
+**3. Execute Advanced Protocols (Terminal Demos):**
 
 ```bash
-# Terminal 1: Start the SSE Server in the background
-python src/protocols/mcp_server.py
+# Terminal 1: Start the FastMCP SSE Server in the background
+python -m src.protocols.mcp_server
 
-# Terminal 2: Run the Protocol Integration Test (Verifies network and MCP capabilities)
-python tests/protocols/test_mcp_manual.py
+# Terminal 2: Run the Non-LLM Infrastructure Integration Test
+python -m tests.protocols.test_mcp_manual
 
-# Terminal 3: Launch the Autonomous Interactive Agent Client
-python src/protocols/mcp_agent_client.py
+# Terminal 3: Run low-level RPC llm client
+python -m src.protocols.llm_call_mcp_sse
+
+# Terminal 4: Run high-level ReAct Agent
+python -m src.protocols.mcp_agent_client
 ```
 
 👨‍💻 About the Author
