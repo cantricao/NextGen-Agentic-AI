@@ -1,6 +1,6 @@
 import os
 import warnings
-# Force suppress all experimental warnings at the system level for a clean terminal
+# Force suppress all experimental warnings at the system level for a clean terminal output
 os.environ["PYTHONWARNINGS"] = "ignore"
 warnings.simplefilter("ignore")
 
@@ -41,6 +41,7 @@ from a2a.client import client as real_client_module
 from a2a.client.card_resolver import A2ACardResolver
 
 class PatchedClientModule:
+    """Hotfix for missing A2ACardResolver in certain a2a-sdk distributions."""
     def __init__(self, real_module) -> None:
         for attr in dir(real_module):
             if not attr.startswith('_'):
@@ -53,20 +54,23 @@ sys.modules['a2a.client.client'] = PatchedClientModule(real_client_module) # typ
 # 1. ATOMIC TOOLS (Business Logic)
 # =====================================================================
 def compute_dti(income: float, debt: float) -> str:
+    """Calculates Debt-to-Income (DTI) ratio. Returns percentage and risk tier."""
     if income <= 0: return "Error: Income must be > 0."
     dti = (debt / income) * 100
     risk = "High Risk" if dti > 43 else "Low Risk"
     return f"Calculated DTI is {dti:.2f}%. Risk status: {risk}."
 
 def search_branch(city: str) -> str:
+    """Searches for the nearest operational bank branch based on city."""
     return f"The nearest branch in {city} is at 120 Broadway, Wall Street. Open 9 AM - 5 PM."
 
 # =====================================================================
-# 2. A2A MICROSERVICES (Next-Gen Gemini 3.x Series)
+# 2. A2A MICROSERVICES (Cost-Optimized Architecture)
 # =====================================================================
-# Using Gemini 3.0 Flash for cost-effective speed, and 3.1 Pro Preview for deep reasoning
-WORKER_MODEL = 'gemini-3-flash-preview'
-COORDINATOR_MODEL = 'gemini-3.1-pro-preview' 
+# Worker: Use cost-effective Flash-Lite for atomic extraction tasks
+WORKER_MODEL = 'gemini-2.5-flash-lite'
+# Coordinator: Use standard Flash for fast intent classification and routing
+COORDINATOR_MODEL = 'gemini-2.5-flash' 
 
 # --- 2A. Loan Specialist Worker ---
 loan_agent = Agent(
@@ -80,7 +84,7 @@ loan_agent = Agent(
 )
 loan_card = AgentCard(
     name='Loan Specialist', description='Processes DTI calculations.',
-    url='http://127.0.0.1:10020', version='3.0',
+    url='http://127.0.0.1:10020', version='1.0',
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['text/plain'],
     preferred_transport=TransportProtocol.jsonrpc,
@@ -103,7 +107,7 @@ support_agent = Agent(
 )
 support_card = AgentCard(
     name='Support Specialist', description='Processes branch searches.',
-    url='http://127.0.0.1:10021', version='3.0',
+    url='http://127.0.0.1:10021', version='1.0',
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['text/plain'],
     preferred_transport=TransportProtocol.jsonrpc,
@@ -114,25 +118,22 @@ remote_support_agent = RemoteA2aAgent(
     agent_card=f'http://127.0.0.1:10021{AGENT_CARD_WELL_KNOWN_PATH}',
 )
 
-# --- 2C. Bank Manager Coordinator (The Brain) ---
-# --- 2C. Bank Manager Coordinator (The Brain) ---
+# --- 2C. Bank Manager Coordinator (The Gatekeeper) ---
 coordinator_agent = LlmAgent(
     name='bank_manager_coordinator',
     model=COORDINATOR_MODEL,
     instruction="""You are the Executive Bank Manager orchestrating requests. 
-    The user query often contains MULTIPLE distinct questions (e.g., finance AND location).
+    The user query often contains distinct questions (e.g., finance OR location).
     
-    CRITICAL FRAMEWORK RULE: 
-    If you call 'transfer_to_agent' sequentially (one by one), you will lose control of the conversation. 
-    To answer multi-part queries, you MUST use PARALLEL TOOL CALLING. 
-    You must call 'transfer_to_agent' for BOTH 'calc_dti_remote' AND 'find_branch_remote' SIMULTANEOUSLY in the exact same generation step.
-    
-    Do not wait between calls. Once both background tasks return, synthesize the final, polite, integrated response in your own words.""",
+    CRITICAL INSTRUCTION:
+    1. You have a built-in tool called 'transfer_to_agent'. You MUST use it to route tasks!
+    2. Use 'transfer_to_agent' to route math/financial inquiries to 'calc_dti_remote'.
+    3. Use 'transfer_to_agent' to route location/branch inquiries to 'find_branch_remote'.""",
     sub_agents=[remote_loan_agent, remote_support_agent],
 )
 coordinator_card = AgentCard(
-    name='Bank Manager', description='Orchestrator using Gemini 3.1 Pro.',
-    url='http://127.0.0.1:10022', version='3.1',
+    name='Bank Manager', description='Main entry point for intent routing.',
+    url='http://127.0.0.1:10022', version='1.0',
     capabilities=AgentCapabilities(streaming=True),
     default_input_modes=['text/plain'], default_output_modes=['application/json'],
     preferred_transport=TransportProtocol.jsonrpc,
@@ -158,7 +159,7 @@ def run_all_servers():
     nest_asyncio.apply()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    print("\n🚀 [System] Booting Distributed A2A Microservices with Gemini 3.x Series...")
+    print("\n🚀 [System] Booting Distributed A2A Microservices...")
     tasks = [
         loop.create_task(start_server(loan_agent, loan_card, 10020)),
         loop.create_task(start_server(support_agent, support_card, 10021)),
@@ -177,7 +178,7 @@ async def test_a2a_system():
         card_resp = await httpx_client.get(f'http://127.0.0.1:10022{AGENT_CARD_WELL_KNOWN_PATH}')
         client = ClientFactory(ClientConfig(httpx_client=httpx_client)).create(AgentCard(**card_resp.json()))
         
-        # --- TEST CASE 1:---
+        # --- TEST CASE 1: Financial Routing ---
         query_1 = "I make 15000 a month and have 4500 in debt. Can you calculate my DTI?"
         print(f"\n👤 [User Query 1 - Finance]: {query_1}")
         print("🤖 [Bank Manager]: Intention detected. Handoff to Loan Specialist (Port 10020)...")
@@ -190,8 +191,8 @@ async def test_a2a_system():
         except Exception:
             print("Failed to parse response.")
 
-        # --- TEST CASE 2:  ---
-        await asyncio.sleep(2) # Simulate user taking time to ask next question
+        # --- TEST CASE 2: Location Routing ---
+        await asyncio.sleep(2)
         query_2 = "Where is the nearest branch in New York?"
         print(f"\n👤 [User Query 2 - Location]: {query_2}")
         print("🤖 [Bank Manager]: Intention detected. Handoff to Support Specialist (Port 10021)...")
