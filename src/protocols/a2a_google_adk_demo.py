@@ -52,20 +52,13 @@ sys.modules['a2a.client.client'] = PatchedClientModule(real_client_module) # typ
 # =====================================================================
 # 1. LANGCHAIN TOOL ADAPTERS (Fixed Mapping for NextGen-Agentic-AI)
 # =====================================================================
-try:
-    # Mapping the exact function names from your src/bank/tools/bank_tools.py
-    from src.bank.tools.bank_tools import compute_dti, search_branch
-except ImportError as e:
-    print(f"⚠️ Import Error: {e}. Attempting path fix...")
-    # Dynamic path fix for Google Colab/Local execution
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-    from src.bank.tools.bank_tools import compute_dti, search_branch
+from src.bank.tools.bank_tools import calculate_dti, search_nearest_branch, get_bank_faq
 
 def adk_compute_dti(income: float, debt: float) -> str:
     """Calculates DTI by invoking the LangChain 'compute_dti' function."""
     try:
         # Note: Your compute_dti is a @tool, so we use .invoke()
-        return compute_dti.invoke({"income": income, "debt": debt})
+        return calculate_dti.invoke({"monthly_income": income, "monthly_debt": debt})
     except Exception as e:
         return f"Error in LangChain DTI tool: {str(e)}"
 
@@ -73,7 +66,7 @@ def adk_search_branch(city: str) -> str:
     """Searches branch by invoking the LangChain 'search_branch' function."""
     try:
         # Note: Your search_branch is a @tool, so we use .invoke()
-        return search_branch.invoke({"city": city})
+        return search_nearest_branch.invoke({"user_location": city})
     except Exception as e:
         return f"Error in LangChain Branch tool: {str(e)}"
 
@@ -200,7 +193,7 @@ async def test_a2a_system():
 
         # --- TEST CASE 2: Location Routing ---
         await asyncio.sleep(2)
-        query_2 = "Where is the nearest branch in New York?"
+        query_2 = "Where is the nearest branch in Chicago?"
         print(f"\n👤 [User Query 2 - Location]: {query_2}")
         print("🤖 [Bank Manager]: Intention detected. Handoff to Support Specialist (Port 10021)...")
         
