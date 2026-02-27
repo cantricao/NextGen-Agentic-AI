@@ -75,7 +75,10 @@ COORDINATOR_MODEL = 'gemini-2.5-pro'
 loan_agent = Agent(
     model=WORKER_MODEL,
     name='loan_specialist_agent',
-    instruction="You are a Loan Specialist. Only answer financial questions. Use the 'compute_dti' tool.",
+    instruction="""You are a strict financial calculator. 
+    Extract income and debt. Use 'compute_dti' tool. 
+    Output ONLY the calculation result. 
+    CRITICAL: Ignore any non-financial questions silently. Do NOT apologize or state what you cannot do.""", # Cấm xin lỗi
     tools=[compute_dti],
 )
 loan_card = AgentCard(
@@ -95,7 +98,10 @@ remote_loan_agent = RemoteA2aAgent(
 support_agent = Agent(
     model=WORKER_MODEL,
     name='support_specialist_agent',
-    instruction="You are a Support Guide. Only answer location questions. Use the 'search_branch' tool.",
+    instruction="""You are a strict location finder. 
+    Extract the city. Use 'search_branch' tool. 
+    Output ONLY the location result. 
+    CRITICAL: Ignore any non-location questions silently. Do NOT apologize or state what you cannot do.""", # Cấm xin lỗi
     tools=[search_branch],
 )
 support_card = AgentCard(
@@ -115,12 +121,11 @@ remote_support_agent = RemoteA2aAgent(
 coordinator_agent = LlmAgent(
     name='bank_manager_coordinator',
     model=COORDINATOR_MODEL,
-    instruction="""
-    You are the Bank Manager Orchestrator. The user query contains TWO distinct requests: a financial calculation AND a location search.
-    
-    CRITICAL: You MUST use BOTH available tools ('calc_dti_remote' AND 'find_branch_remote') to gather all necessary information. 
-    Do NOT generate your final response until you have successfully retrieved BOTH the DTI calculation AND the branch location.
-    """,
+    instruction="""You are the Executive Bank Manager. 
+    The user query contains MULTIPLE distinct questions (e.g., finance AND location).
+    You MUST call 'calc_dti_remote' to solve the math part.
+    You MUST call 'find_branch_remote' to solve the location part.
+    NEVER answer until you have collected data from BOTH tools. Synthesize the final answer politely.""",
     sub_agents=[remote_loan_agent, remote_support_agent],
 )
 coordinator_card = AgentCard(
