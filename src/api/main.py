@@ -10,7 +10,7 @@ load_dotenv()
 
 app = FastAPI(
     title="NextGen Agentic AI API Gateway",
-    description="Secure, production-ready endpoints with Human-in-the-Loop support.",
+    description="Secure, async, production-ready endpoints with Human-in-the-Loop support.",
     version="1.0.0"
 )
 
@@ -26,34 +26,30 @@ def verify_api_key(api_key: str = Depends(api_key_header)) -> str:
     return api_key
 
 @app.get("/health", tags=["System"])
-def health_check():
-    """Liveness probe endpoint."""
+async def health_check():
+    """Async liveness probe endpoint."""
     return {"status": "healthy", "service": "NextGen-Agentic-AI"}
 
 @app.post("/v1/agent/invoke", dependencies=[Depends(verify_api_key)], tags=["Core Agents"])
-def invoke_agent(user_message: str, session_id: str):
+async def invoke_agent(user_message: str, session_id: str):
     """
-    Invokes the agent. If a high-risk action is detected, it pauses execution
-    and returns a 'requires_approval' status.
+    Asynchronously invokes the agent. Handles high-traffic loads efficiently.
     """
-    logger.info(f"Agent invoked by session_id: {session_id}")
-    
-    # Configure the thread_id to persist state for this specific user session
+    logger.info(f"Agent invoked asynchronously by session_id: {session_id}")
     config = {"configurable": {"thread_id": session_id}}
     
     try:
-        # Run the graph until it finishes OR hits an interrupt_before breakpoint
-        result = shopify_graph.invoke({"messages": [("user", user_message)]}, config=config)
+        # Use await and ainvoke() for non-blocking execution
+        result = await shopify_graph.ainvoke({"messages": [("user", user_message)]}, config=config)
         
-        # Check current state of the graph
+        # Async check of the graph state
         current_state = shopify_graph.get_state(config)
         
-        # If 'next' contains 'tools', it means the graph is paused waiting for human approval
         if current_state.next and "tools" in current_state.next:
             logger.info(f"Session {session_id} paused for Human-in-the-Loop approval.")
             return {
                 "status": "requires_approval",
-                "message": "Agent proposed a high-risk action (e.g., refund). Waiting for admin approval.",
+                "message": "Agent proposed a high-risk action. Waiting for admin approval.",
                 "pending_tools": result["messages"][-1].tool_calls
             }
             
@@ -63,13 +59,13 @@ def invoke_agent(user_message: str, session_id: str):
         }
         
     except Exception as e:
-        logger.error(f"Workflow execution failed. Error: {str(e)}")
+        logger.error(f"Workflow execution failed asynchronously. Error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Agent Error")
 
 @app.post("/v1/agent/approve", dependencies=[Depends(verify_api_key)], tags=["Human-in-the-Loop"])
-def approve_action(session_id: str):
+async def approve_action(session_id: str):
     """
-    Admin endpoint to approve and resume a paused workflow.
+    Asynchronous admin endpoint to approve and resume a paused workflow.
     """
     config = {"configurable": {"thread_id": session_id}}
     current_state = shopify_graph.get_state(config)
@@ -77,10 +73,10 @@ def approve_action(session_id: str):
     if not current_state.next or "tools" not in current_state.next:
         raise HTTPException(status_code=400, detail="No pending actions awaiting approval for this session.")
     
-    logger.info(f"Admin approved pending actions for session_id: {session_id}. Resuming workflow...")
+    logger.info(f"Admin approved actions for session_id: {session_id}. Resuming asynchronously...")
     
-    # Resume the graph by invoking it with None (continues from checkpoint)
-    result = shopify_graph.invoke(None, config=config)
+    # Resume the graph non-blocking
+    result = await shopify_graph.ainvoke(None, config=config)
     
     return {
         "status": "action_executed",

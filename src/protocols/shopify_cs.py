@@ -1,3 +1,4 @@
+import asyncio
 from typing import TypedDict, Annotated, Sequence
 import operator
 from langgraph.graph import StateGraph, END
@@ -12,26 +13,50 @@ class ShopifyTicketState(TypedDict):
     ticket_id: str
     requires_human_approval: bool
 
-# Dummy Tools simulating Shopify/Richpanel APIs
+# ==========================================
+# ENTERPRISE ERROR HANDLING (THE "ARMOR")
+# ==========================================
 def fetch_order_status(order_id: str) -> str:
-    """Fetches order tracking info from Shopify."""
-    return f"Order {order_id} is delayed in transit."
+    """Fetches order tracking info from Shopify with strict error handling."""
+    try:
+        # Simulate network latency
+        # await asyncio.sleep(0.5) # If this were an async tool
+        
+        # Simulate a random API failure for demonstration
+        if order_id.upper() == "FAIL":
+            raise TimeoutError("Shopify API is currently unresponsive.")
+            
+        return f"Order {order_id} is delayed in transit."
+    except Exception as e:
+        # DO NOT crash the graph. Return the error so the LLM can apologize to the user.
+        print(f"[ERROR] fetch_order_status failed: {e}")
+        return f"SYSTEM ERROR: Unable to fetch data due to '{str(e)}'. Please politely apologize to the customer and ask them to try again later."
 
 def propose_refund(order_id: str) -> str:
     """Proposes a refund. This triggers the HITL pause."""
-    return f"Refund successfully executed for {order_id}."
+    try:
+        return f"Refund successfully executed for {order_id}."
+    except Exception as e:
+        return f"SYSTEM ERROR: Refund failed due to '{str(e)}'."
 
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.1)
 tools = [fetch_order_status, propose_refund]
 llm_with_tools = llm.bind_tools(tools)
 
-def support_agent_node(state: ShopifyTicketState) -> dict:
-    """Analyzes the Richpanel ticket and strictly adheres to SOPs."""
+# ==========================================
+# ASYNCHRONOUS NODE EXECUTION
+# ==========================================
+async def support_agent_node(state: ShopifyTicketState) -> dict:
+    """
+    Analyzes the Richpanel ticket asynchronously to prevent event-loop blocking.
+    """
     messages = state.get("messages", [])
     system_prompt = SystemMessage(
-        content="You are an E-commerce CS Agent. Follow SOP strictly. If an order is delayed, ALWAYS propose a refund using the tool."
+        content="You are an E-commerce CS Agent. Follow SOP strictly. If a tool returns a SYSTEM ERROR, apologize to the user."
     )
-    response = llm_with_tools.invoke([system_prompt] + messages)
+    
+    # Use ainvoke() instead of invoke() for non-blocking I/O
+    response = await llm_with_tools.ainvoke([system_prompt] + messages)
     
     requires_approval = False
     if hasattr(response, 'tool_calls') and response.tool_calls:
@@ -42,13 +67,10 @@ def support_agent_node(state: ShopifyTicketState) -> dict:
                 
     return {"messages": [response], "requires_human_approval": requires_approval}
 
-# ENTERPRISE FEATURE: Global MemorySaver to persist state across HTTP requests
 memory_checkpointer = MemorySaver()
 
 def build_shopify_mvp_graph():
-    """
-    Compiles the MVP with a Checkpointer for cross-request state persistence.
-    """
+    """Compiles the MVP with Checkpointer and Async support."""
     workflow = StateGraph(ShopifyTicketState)
     tool_node = ToolNode(tools)
     
@@ -64,8 +86,6 @@ def build_shopify_mvp_graph():
     workflow.add_conditional_edges("agent", route_to_tools)
     workflow.add_edge("tools", "agent")
     
-    # Compile with the checkpointer to enable true HITL via API
     return workflow.compile(checkpointer=memory_checkpointer, interrupt_before=["tools"])
 
-# Export a singleton instance for the API to use
 shopify_graph = build_shopify_mvp_graph()
