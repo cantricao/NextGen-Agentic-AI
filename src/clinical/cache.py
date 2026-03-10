@@ -1,7 +1,7 @@
 import json
 import numpy as np
 import redis
-from redis.commands.search.field import VectorField, TextField
+from redis.commands.search.field import VectorField, TextField, TagField
 from redis.commands.search.query import Query
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from sentence_transformers import SentenceTransformer
@@ -39,7 +39,7 @@ class ClinicalSemanticCache:
             print("[INFO] Creating new Redis Vector Index...")
             # Define schema: isolating by patient_id, searching by embedding
             schema = (
-                TextField("patient_id"),
+                TagField("patient_id"),
                 TextField("response"),
                 VectorField("embedding", "FLAT", {
                     "TYPE": "FLOAT32",
