@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: nextgen_agent_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis_vector_db
+      - REDIS_PORT=6379
+      # Inject other environment variables here or via .env file
+    depends_on:
+      redis_vector_db:
+        condition: service_healthy
+    networks:
+      - agent_network
+
+  redis_vector_db:
+    # Must use redis-stack-server to support RediSearch (Vector Database)
+    image: redis/redis-stack-server:latest
+    container_name: nextgen_redis_stack
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agent_network
+    volumes:
+      - redis_data:/data
+
+networks:
+  agent_network:
+    driver: bridge
+
+volumes:
+  redis_data:
