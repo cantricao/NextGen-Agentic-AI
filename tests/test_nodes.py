@@ -20,7 +20,13 @@ def test_route_after_router_deterministic():
 
 def test_route_after_agent_with_tool_calls():
     """Verify that agents requesting tools are routed to the ToolNode."""
-    mock_message = AIMessage(content="", tool_calls=[{"name": "calculate_dti"}])
+    # LangChain strict schema requires 'name', 'args', and 'id' for valid tool calls.
+    mock_tool_call = {
+        "name": "calculate_dti",
+        "args": {"income": 100000, "debt": 30000},
+        "id": "call_mock_123xyz"
+    }
+    mock_message = AIMessage(content="", tool_calls=[mock_tool_call])
     state = BankAgentState(messages=[mock_message])
     
     assert route_after_agent(state) == "tools"
