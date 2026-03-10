@@ -3,7 +3,7 @@ import numpy as np
 import redis
 from redis.commands.search.field import VectorField, TextField
 from redis.commands.search.query import Query
-from redis.commands.search.indexDefinition import IndexDefinition, IndexType
+from redis.commands.search.index_definition import IndexDefinition, IndexType
 from sentence_transformers import SentenceTransformer
 
 # Initialize the embedding model
