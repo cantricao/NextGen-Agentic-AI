@@ -176,6 +176,8 @@ docker-compose logs -f api
 # Access the Secure Swagger UI
 # http://localhost:8000/docs
 
+```
+
 👨‍💻 About the Author
 ----------------------
 
