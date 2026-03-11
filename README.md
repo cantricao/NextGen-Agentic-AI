@@ -72,13 +72,22 @@ Located in `src/protocols/`, this section showcases the future of decoupled AI c
 |  > calculate_dti.invoke()    |       | > search_nearest_branch()    |
 +------------------------------+       +------------------------------+
 ```
+
+### 4. 🛒 E-Commerce CS Agent (Stateful HITL & Async API Gateway)
+
+A production-ready Customer Service protocol demonstrating asynchronous concurrency and secure execution pausing.
+* **Fully Asynchronous API:** Built with FastAPI and LangGraph's `ainvoke()`, enabling non-blocking I/O that can handle thousands of concurrent requests without dropping connections.
+* **Stateful Human-in-the-Loop (HITL):** Utilizes LangGraph's `MemorySaver` checkpointer bound to unique `session_id`s. When the LLM proposes a high-risk action (e.g., executing a Shopify refund), the DAG halts execution and returns a `requires_approval` flag via API. 
+* **Cross-Request Resumption:** An admin can review the paused state and trigger the `/v1/agent/approve` webhook to resume the exact graph state perfectly.
 ---
 
 ## 🛡️ Technical Hardening (Engineering Excellence)
 * **Zero-Hallucination Guardrails:** Tools are designed with strict "I don't know" fallbacks. If the RAG similarity score is below the safety margin, the system redirects to human support.
 * **Model Tiering:** Strategically uses `gemini-2.5-flash` for coordination and `gemini-2.5-flash-lite` for cost-efficient tool execution.
 * **Infrastructure Testing:** Built a strict, non-LLM integration test suite (`test_mcp_manual.py`) to verify network and protocol layers before generative model deployment.
-
+* **Resilient Tool Execution:** External API tools are wrapped in strict `try/catch` armor. If a third-party API (like Shopify or Bank ERP) times out, the tool catches the exception and returns the error string to the LLM. The agent dynamically handles the failure by politely apologizing to the user, preventing HTTP 500 server crashes.
+* **100% Mocked CI/CD Testing Pipeline:** Integrated a robust `pytest` suite running on GitHub Actions. It leverages `AsyncMock` to freeze asynchronous LLM instances, allowing the pipeline to rigorously test routing logic and API security (X-API-Key) without consuming a single token of API quota.
+* **Dockerized Infrastructure:** The entire ecosystem, including the FastAPI gateway and Redis Stack, is containerized via a multi-stage `Dockerfile` and `docker-compose.yml` for seamless, single-command deployment.
 
 ---
 
@@ -104,15 +113,27 @@ Located in `src/protocols/`, this section showcases the future of decoupled AI c
 **1. Prerequisites:**
 ```bash
 # Install Redis (Required for Clinical Semantic Cache)
-sudo apt-get install redis-server
-redis-server --daemonize yes
+# 1. Download and extract Redis Stack (Ubuntu 22.04 Jammy build)
+wget [https://packages.redis.io/redis-stack/redis-stack-server-7.2.0-v9.jammy.x86_64.tar.gz](https://packages.redis.io/redis-stack/redis-stack-server-7.2.0-v9.jammy.x86_64.tar.gz)
+tar -xvf redis-stack-server-7.2.0-v9.jammy.x86_64.tar.gz
+
+# 2. Start the Vector Database in the background
+./redis-stack-server-7.2.0-v9/bin/redis-stack-server --daemonize yes
+
+# 3. Verify the server is running
+./redis-stack-server-7.2.0-v9/bin/redis-cli ping
 
 # Clone the repository and install dependencies
 git clone [https://github.com/cantricao/NextGen-Agentic-AI.git](https://github.com/cantricao/NextGen-Agentic-AI.git)
 cd NextGen-Agentic-AI
 pip install -r requirements.txt
 ```
+💡 Architect's Note: Due to recent Redis licensing changes (RSALv2) and the deprecation of native OS package managers for Redis Stack, this architecture strictly enforces containerized deployment via Docker to guarantee immutable infrastructure and Vector Search compatibility
 
+```bash
+# Spin up the Redis Stack Vector Database (Port 6379 & UI on 8001)
+docker run -d --name redis-stack -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
+```
 
 **2. Launch the Applications via Streamlit:** Ensure your .env contains your GOOGLE\_API\_KEY or GEMINI\_API\_KEY.
 
@@ -143,12 +164,26 @@ python -m src.protocols.mcp_agent_client
 python -m src.protocols.a2a_google_adk_demo
 ```
 
+### 4. Enterprise Deployment (Docker Compose):
+For a true production environment without local dependencies, spin up the Async API Gateway and Redis Vector Database simultaneously:
+```bash
+# Ensure .env contains API_SECRET_KEY and GOOGLE_API_KEY
+docker-compose up -d --build
+
+# View real-time asynchronous execution logs
+docker-compose logs -f api
+
+# Access the Secure Swagger UI
+# http://localhost:8000/docs
+
 👨‍💻 About the Author
 ----------------------
 
 **Tri Cao Can** AI Engineer & Data Analyst | Biomedical Data Science Specialist
 
-With over 3 years of professional experience in developing machine learning models and automated data pipelines , I hold a Master of Data Analytics from QUT. My core focus lies at the intersection of computational biology, genomic data analysis, and scalable AI infrastructure. This repository reflects my passion for building secure, data-driven systems that solve complex translational challenges.
+With over 3 years of professional experience in developing machine learning models and automated data pipelines, I hold a Master of Data Analytics (Specializing in Biomedical Data Science) from QUT. 
+
+My core expertise lies in designing **Scalable AI Architectures and Multi-Agent Systems** that solve complex, high-stakes challenges. Whether it is processing genomic data for computational biology, enforcing strict zero-hallucination guardrails for FinTech, or building asynchronous API gateways for Enterprise E-commerce, my focus is always on engineering secure, production-ready, and data-driven solutions.
 
 * **Email:** cantricao@gmail.com
 * **LinkedIn:** [linkedin.com/in/cao-tri-can](https://www.linkedin.com/in/cao-tri-can-08188b21b/)
