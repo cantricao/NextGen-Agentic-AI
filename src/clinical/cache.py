@@ -59,8 +59,7 @@ class ClinicalSemanticCache:
             return None
 
         query_vector = embedding_model.encode(query).astype(np.float32).tobytes()
-        
-	    safe_patient_id = patient_id.replace("-", "\\-")
+        safe_patient_id = patient_id.replace("-", "\\-")
         # Construct RediSearch Query: Filter by patient_id, then calculate KNN
         q = (
             Query(f"(@patient_id:{{{safe_patient_id}}})=>[KNN 1 @embedding $vec AS score]")
