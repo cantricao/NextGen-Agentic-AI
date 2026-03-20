@@ -1,5 +1,16 @@
 # 🚀 NextGen Agentic AI Ecosystem: Enterprise Multi-Agent & RAG Infrastructure
 
+<div align="center">
+  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python Version">
+  <img src="https://img.shields.io/badge/Orchestration-LangGraph-000000.svg" alt="LangGraph">
+  <img src="https://img.shields.io/badge/API_Gateway-FastAPI-009688.svg" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Semantic_Cache-Redis_Stack-DC382D.svg" alt="Redis Stack">
+  <img src="https://img.shields.io/badge/Vector_DB-ChromaDB%20%7C%20FAISS-4B0082.svg" alt="ChromaDB & FAISS">
+  <img src="https://img.shields.io/badge/CI%2FCD-Passed-brightgreen.svg" alt="Build Status">
+</div>
+
+<br>
+
 ## 📌 Executive Summary
 An enterprise-grade, multi-agent AI ecosystem demonstrating high-performance orchestration, real-time tool execution, and privacy-centric data retrieval. This repository moves beyond basic wrappers to implement **Stateful Graphs, Semantic Caching, and and Distributed Agentic Protocols.**
 
